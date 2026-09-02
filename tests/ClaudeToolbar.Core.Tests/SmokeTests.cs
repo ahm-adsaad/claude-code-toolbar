@@ -1,3 +1,5 @@
+using System.Reflection;
+
 namespace ClaudeToolbar.Core.Tests;
 
 public class SmokeTests
@@ -5,8 +7,7 @@ public class SmokeTests
     [Fact]
     public void CoreAssemblyLoads()
     {
-        var assembly = typeof(SmokeTests).Assembly.GetReferencedAssemblies()
-            .Single(a => a.Name == "ClaudeToolbar.Core");
-        Assert.NotNull(assembly);
+        var assembly = Assembly.Load("ClaudeToolbar.Core");
+        Assert.Equal("ClaudeToolbar.Core", assembly.GetName().Name);
     }
 }
