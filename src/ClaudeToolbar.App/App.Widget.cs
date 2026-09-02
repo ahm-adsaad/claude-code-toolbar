@@ -13,6 +13,7 @@ namespace ClaudeToolbar.App;
 public partial class App
 {
     private WidgetWindow? _widget;
+    private WidgetController? _controller;
 
     partial void OnStartupCore(StartupEventArgs e)
     {
@@ -26,24 +27,13 @@ public partial class App
 
         _widget = new WidgetWindow();
         _widget.Render(model, Settings.Rows, WidgetTheme.FromSettings(Settings.Appearance));
-        _widget.ShowNoActivate();
-
-        var layout = TaskbarLocator.Locate();
-        if (layout is null)
-        {
-            Log.Error("Taskbar not found");
-            return;
-        }
-        _widget.SetMaxPhysicalHeight(WidgetPlacement.MaxWidgetHeight(layout.TaskbarNow));
-        _widget.UpdateLayout();
-        var (w, h) = _widget.PhysicalSize();
-        var target = WidgetPlacement.Compute(layout.TaskbarNow, layout.Notify, w, h, Settings.Behavior.TrayGapPx);
-        _widget.MoveTo(target);
-        Log.Info($"Widget placed at {target} (size {w}x{h})");
+        _controller = new WidgetController(_widget, new TaskbarTracker(_widget), () => Settings);
+        _controller.Start();
     }
 
     partial void OnExitCore()
     {
+        _controller?.Dispose();
         _widget?.Close();
     }
 }
