@@ -1,0 +1,16 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+publish/
+TestResults/
+
+# Editors
+.idea/
+*.swp
+
+# Local
+*.log
+.claude/
