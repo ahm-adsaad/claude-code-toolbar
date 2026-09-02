@@ -1,3 +1,4 @@
+using System.Windows;
 using ClaudeToolbar.App.Interop;
 using ClaudeToolbar.Core.Layout;
 using ClaudeToolbar.Core.Settings;
@@ -10,6 +11,8 @@ public sealed class WidgetController : IDisposable
     private readonly WidgetWindow _window;
     private readonly TaskbarTracker _tracker;
     private readonly Func<AppSettings> _settings;
+    private readonly SizeChangedEventHandler _onSizeChanged;
+    private bool _repositioning;
 
     public WidgetController(WidgetWindow window, TaskbarTracker tracker, Func<AppSettings> settings)
     {
@@ -17,7 +20,8 @@ public sealed class WidgetController : IDisposable
         _tracker = tracker;
         _settings = settings;
         _tracker.Changed += Reposition;
-        _window.SizeChanged += (_, _) => Reposition();
+        _onSizeChanged = (_, _) => Reposition();
+        _window.SizeChanged += _onSizeChanged;
     }
 
     public void Start() => _tracker.Start();
@@ -26,6 +30,20 @@ public sealed class WidgetController : IDisposable
     public void Relocate() => _tracker.Relocate();
 
     public void Reposition()
+    {
+        if (_repositioning) return;
+        _repositioning = true;
+        try
+        {
+            RepositionCore();
+        }
+        finally
+        {
+            _repositioning = false;
+        }
+    }
+
+    private void RepositionCore()
     {
         var layout = _tracker.Layout;
         if (layout is null)
@@ -59,6 +77,7 @@ public sealed class WidgetController : IDisposable
 
     public void Dispose()
     {
+        _window.SizeChanged -= _onSizeChanged;
         _tracker.Changed -= Reposition;
         _tracker.Dispose();
     }
