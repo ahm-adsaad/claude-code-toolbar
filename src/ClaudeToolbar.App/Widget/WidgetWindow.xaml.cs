@@ -17,6 +17,7 @@ public partial class WidgetWindow : Window
     {
         InitializeComponent();
         Root.Children.Add(_rows);
+        InitializeInteraction();
     }
 
     public IntPtr Handle { get; private set; }
