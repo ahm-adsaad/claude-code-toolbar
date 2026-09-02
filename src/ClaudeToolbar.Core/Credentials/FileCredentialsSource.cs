@@ -58,8 +58,8 @@ public sealed class FileCredentialsSource : ICredentialsSource
             if (!oauth.TryGetProperty("expiresAt", out var expEl) || expEl.ValueKind != JsonValueKind.Number)
                 return new CredentialsState.Invalid(Path, "expiresAt missing");
 
-            var expiresMs = expEl.TryGetInt64(out var ms) ? ms : (long)expEl.GetDouble();
-            var expiresAt = DateTimeOffset.FromUnixTimeMilliseconds(expiresMs);
+            if (!TryReadEpochMilliseconds(expEl, out var expiresAt))
+                return new CredentialsState.Invalid(Path, "expiresAt out of range");
 
             string? subscription = oauth.TryGetProperty("subscriptionType", out var subEl) && subEl.ValueKind == JsonValueKind.String
                 ? subEl.GetString()
@@ -73,6 +73,26 @@ public sealed class FileCredentialsSource : ICredentialsSource
         catch (JsonException ex)
         {
             return new CredentialsState.Invalid(Path, $"Invalid JSON: {ex.Message}");
+        }
+    }
+
+    private static bool TryReadEpochMilliseconds(JsonElement element, out DateTimeOffset value)
+    {
+        value = default;
+        if (!element.TryGetInt64(out var ms))
+        {
+            var asDouble = element.GetDouble();
+            if (double.IsNaN(asDouble) || asDouble < long.MinValue || asDouble > long.MaxValue) return false;
+            ms = (long)asDouble;
+        }
+        try
+        {
+            value = DateTimeOffset.FromUnixTimeMilliseconds(ms);
+            return true;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return false;
         }
     }
 }

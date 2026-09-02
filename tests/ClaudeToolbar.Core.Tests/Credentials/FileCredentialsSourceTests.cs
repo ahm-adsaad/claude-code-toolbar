@@ -60,6 +60,7 @@ public class FileCredentialsSourceTests : IDisposable
     [InlineData("{}")]
     [InlineData("""{ "claudeAiOauth": { "expiresAt": 1 } }""")]
     [InlineData("""{ "claudeAiOauth": { "accessToken": "x" } }""")]
+    [InlineData("""{ "claudeAiOauth": { "accessToken": "x", "expiresAt": 999999999999999999999999999999999999999999 } }""")]
     public void InvalidShapes(string json)
     {
         var path = Write(json);
@@ -72,5 +73,13 @@ public class FileCredentialsSourceTests : IDisposable
         var path = Write(Payload(Now.AddHours(7).ToUnixTimeMilliseconds(), token: "SUPERSECRET"));
         var state = new FileCredentialsSource(path, _clock).Read();
         Assert.DoesNotContain("SUPERSECRET", state.ToString());
+    }
+
+    [Fact]
+    public void MissingSubscriptionTypeIsNull()
+    {
+        var path = Write($$"""{ "claudeAiOauth": { "accessToken": "tok", "expiresAt": {{Now.AddHours(7).ToUnixTimeMilliseconds()}} } }""");
+        var state = Assert.IsType<CredentialsState.Valid>(new FileCredentialsSource(path, _clock).Read());
+        Assert.Null(state.SubscriptionType);
     }
 }
