@@ -14,6 +14,8 @@ public sealed class UsageRowsControl : Border
     private const double Gap = 6;
 
     private readonly StackPanel _rows = new() { Orientation = Orientation.Vertical, VerticalAlignment = VerticalAlignment.Center };
+    private readonly StackPanel _rows2 = new() { Orientation = Orientation.Vertical, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0), Visibility = Visibility.Collapsed };
+    private readonly StackPanel _columns = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
     private readonly Ellipse _staleDot = new() { Width = 6, Height = 6, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(Gap, 0, 0, 0), Visibility = Visibility.Collapsed };
     private readonly List<(TextBlock Time, TextBlock Percent)> _live = new();
 
@@ -22,7 +24,9 @@ public sealed class UsageRowsControl : Border
         var panel = new DockPanel { LastChildFill = true };
         DockPanel.SetDock(_staleDot, Dock.Right);
         panel.Children.Add(_staleDot);
-        panel.Children.Add(_rows);
+        _columns.Children.Add(_rows);
+        _columns.Children.Add(_rows2);
+        panel.Children.Add(_columns);
         Child = panel;
         Padding = new Thickness(8, 2, 8, 2);
         SnapsToDevicePixels = true;
@@ -40,16 +44,23 @@ public sealed class UsageRowsControl : Border
         _staleDot.Visibility = model.ShowStaleDot ? Visibility.Visible : Visibility.Collapsed;
 
         _rows.Children.Clear();
+        _rows2.Children.Clear();
         _live.Clear();
 
         if (model.Rows.Count == 0)
         {
+            _rows2.Visibility = Visibility.Collapsed;
             _rows.Children.Add(MakeText(model.Notice ?? string.Empty, theme, 0));
             return;
         }
 
-        foreach (var row in model.Rows)
-            _rows.Children.Add(MakeRow(row, rows, theme));
+        _rows2.Visibility = model.Rows.Count > 2 ? Visibility.Visible : Visibility.Collapsed;
+
+        for (var i = 0; i < model.Rows.Count; i++)
+        {
+            var target = i < 2 ? _rows : _rows2;
+            target.Children.Add(MakeRow(model.Rows[i], rows, theme));
+        }
     }
 
     public void UpdateTimes(WidgetModel model)
