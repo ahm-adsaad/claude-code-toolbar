@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
+using System.Windows.Media;
 using ClaudeToolbar.App.Widget;
 using ClaudeToolbar.Core.Credentials;
 using ClaudeToolbar.Core.Refresh;
@@ -28,6 +30,18 @@ public partial class SettingsWindow : Window
     }
 
     public SettingsViewModel ViewModel => _vm;
+
+    // On this machine, this window's content renders as blank under WPF's default hardware/DWM
+    // composition path (confirmed with PrintWindow(PW_RENDERFULLCONTENT), not just a screen-capture
+    // artifact), while the app's other windows (which use AllowsTransparency) render fine. Forcing
+    // software rendering for just this window's composition target avoids the broken hardware path
+    // without affecting the rest of the app.
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        if (PresentationSource.FromVisual(this) is HwndSource hwndSource)
+            hwndSource.CompositionTarget.RenderMode = RenderMode.SoftwareOnly;
+    }
 
     private void OnVmChanged(object? sender, PropertyChangedEventArgs e) => RenderPreview();
 

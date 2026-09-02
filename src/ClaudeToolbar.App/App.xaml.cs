@@ -22,15 +22,6 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-
-        // On this machine, standard (non-layered) top-level windows render zero content under WPF's
-        // default hardware/DWM composition path (confirmed with a minimal repro: a plain Window with a
-        // solid Background never paints, while AllowsTransparency=True windows like WidgetWindow are
-        // fine). Forcing software rendering for the whole process sidesteps the broken hardware
-        // composition path; it is functionally transparent to the app and only affects this window
-        // family (the settings window), which is small and infrequently shown.
-        System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
-
         if (e.Args.Contains("--dump-taskbar", StringComparer.OrdinalIgnoreCase))
         {
             DumpTaskbar();
