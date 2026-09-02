@@ -22,6 +22,13 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        if (e.Args.Contains("--dump-taskbar", StringComparer.OrdinalIgnoreCase))
+        {
+            DumpTaskbar();
+            Shutdown();
+            return;
+        }
+
         DispatcherUnhandledException += (_, args) => { Log.Error("Unhandled UI exception", args.Exception); args.Handled = true; };
         AppDomain.CurrentDomain.UnhandledException += (_, args) => Log.Error("Unhandled exception", args.ExceptionObject as Exception);
         TaskScheduler.UnobservedTaskException += (_, args) => { Log.Error("Unobserved task exception", args.Exception); args.SetObserved(); };
@@ -100,5 +107,17 @@ public partial class App : Application
     {
         try { action(); }
         catch (Exception ex) { Log.Error($"Failed: {what}", ex); }
+    }
+
+    private static void DumpTaskbar()
+    {
+        var layout = Interop.TaskbarLocator.Locate();
+        var text = layout is null
+            ? "Taskbar not found"
+            : $"Tray HWND: 0x{layout.TrayHwnd:X}\nNotify HWND: 0x{layout.NotifyHwnd:X}\nTaskbar (docked): {layout.Taskbar}\nTaskbar (now): {layout.TaskbarNow}\nNotify: {layout.Notify}\nMonitor: {layout.Monitor}\nAutoHide: {layout.AutoHide}\nExplorer PID: {layout.ExplorerPid}";
+        var path = Path.Combine(Log.LogDirectory, "taskbar-dump.txt");
+        Directory.CreateDirectory(Log.LogDirectory);
+        File.WriteAllText(path, text);
+        Log.Info($"Wrote taskbar dump to {path}");
     }
 }
