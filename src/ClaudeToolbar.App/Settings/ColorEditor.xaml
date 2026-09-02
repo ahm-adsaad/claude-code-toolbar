@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <StackPanel Orientation="Horizontal">
         <Button x:Name="Swatch" Width="30" Height="24" Padding="2" Click="Swatch_Click">
-            <Border x:Name="SwatchFill" CornerRadius="3" />
+            <Border x:Name="SwatchFill" Width="18" Height="12" CornerRadius="3" />
         </Button>
         <TextBox x:Name="Hex" Width="100" Margin="6,0,0,0" VerticalContentAlignment="Center" LostFocus="Hex_LostFocus" KeyDown="Hex_KeyDown" />
         <Popup x:Name="Picker" PlacementTarget="{Binding ElementName=Swatch}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
