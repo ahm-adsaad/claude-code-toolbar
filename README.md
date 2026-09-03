@@ -19,7 +19,7 @@ Claude Toolbar does not have its own login. It reads the credentials that Claude
 
 ## Install and run
 
-1. Download `ClaudeToolbar.exe` from the latest build artifact (Actions → build → ClaudeToolbar-win-x64) or build it yourself (below).
+1. Download `ClaudeToolbar.exe` from the latest build artifact (Actions → build → ClaudeToolbar-win-x64) or build it yourself (below). The exe is not code-signed, so Windows SmartScreen may show "Windows protected your PC" the first time; choose "More info" then "Run anyway". The single-file build is around 70 MB.
 2. Run it. The widget appears in the taskbar and an icon appears in the tray. "Run at startup" is on by default; turn it off from the menu or settings.
 3. Make sure you have signed in to Claude Code at least once on this machine (`claude` in a terminal).
 
@@ -32,7 +32,7 @@ Open from the widget, the tray icon, or by launching the exe a second time.
 - Behaviour: refresh interval (30–300 s), gap from the tray, hide when a fullscreen app is active, run at startup.
 - Account: which credentials file is in use and the login state.
 
-Settings live in `%APPDATA%\ClaudeToolbar\settings.json`. Logs live in `%LOCALAPPDATA%\ClaudeToolbar\logs\app.log`.
+Settings live in `%APPDATA%\ClaudeToolbar\settings.json`. Logs live in `%LOCALAPPDATA%\ClaudeToolbar\logs\app.log`. If something looks wrong, the log file is the first place to look; run `ClaudeToolbar.exe --dump-taskbar` to write the taskbar rectangles it detected to `%LOCALAPPDATA%\ClaudeToolbar\logs\taskbar-dump.txt`.
 
 ## Build from source
 
