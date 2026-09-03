@@ -21,12 +21,19 @@ public sealed class TaskbarTracker : IDisposable
     {
         _window = window;
         _window.ShellMessage += OnShellMessage;
-        _timer.Tick += (_, _) => Evaluate(force: false);
+        _timer.Tick += (_, _) =>
+        {
+            Evaluate(force: false);
+            Sanity?.Invoke();
+        };
     }
 
     public TaskbarLayout? Layout { get; private set; }
 
     public event Action? Changed;
+
+    /// <summary>Raised once per second regardless of whether the layout changed; the controller re-checks fullscreen and z-order on it.</summary>
+    public event Action? Sanity;
 
     public void Start()
     {

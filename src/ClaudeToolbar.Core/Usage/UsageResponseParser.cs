@@ -40,7 +40,7 @@ public static class UsageResponseParser
     {
         if (!root.TryGetProperty(name, out var el) || el.ValueKind != JsonValueKind.Object)
             return null;
-        if (!el.TryGetProperty("utilization", out var u) || u.ValueKind != JsonValueKind.Number)
+        if (!el.TryGetProperty("utilization", out var u) || u.ValueKind != JsonValueKind.Number || !u.TryGetDouble(out var raw))
             return null;
 
         DateTimeOffset? resetsAt = null;
@@ -50,6 +50,6 @@ public static class UsageResponseParser
             resetsAt = parsed;
         }
 
-        return new UsageWindow(Math.Clamp(u.GetDouble(), 0, 100), resetsAt);
+        return new UsageWindow(Math.Clamp(raw, 0, 100), resetsAt);
     }
 }

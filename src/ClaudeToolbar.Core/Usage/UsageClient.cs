@@ -55,6 +55,10 @@ public sealed class UsageClient : IUsageClient
         {
             return new UsageResult.Failed(ex.Message);
         }
+        catch (IOException ex)
+        {
+            return new UsageResult.Failed(ex.Message);
+        }
     }
 
     private TimeSpan? ReadRetryAfter(HttpResponseMessage response)

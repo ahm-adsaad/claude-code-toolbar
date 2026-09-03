@@ -20,6 +20,7 @@ public sealed class WidgetController : IDisposable
         _tracker = tracker;
         _settings = settings;
         _tracker.Changed += Reposition;
+        _tracker.Sanity += Reposition;
         _onSizeChanged = (_, _) => Reposition();
         _window.SizeChanged += _onSizeChanged;
     }
@@ -79,6 +80,7 @@ public sealed class WidgetController : IDisposable
     {
         _window.SizeChanged -= _onSizeChanged;
         _tracker.Changed -= Reposition;
+        _tracker.Sanity -= Reposition;
         _tracker.Dispose();
     }
 }

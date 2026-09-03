@@ -41,9 +41,11 @@ public partial class App : Application
             return;
         }
 
-        Settings = SettingsStore.Load();
-        if (!File.Exists(SettingsStore.Path)) SettingsStore.Save(Settings);
-        TrySafe(() => StartupRegistration.Apply(Settings.Behavior.RunAtStartup), "startup registration");
+        TrySafe(() =>
+        {
+            Settings = SettingsStore.Load();
+            if (!File.Exists(SettingsStore.Path)) SettingsStore.Save(Settings);
+        }, "load settings");
 
         _menu = new AppMenu(Settings.Behavior.RunAtStartup);
         _menu.ExitRequested += Shutdown;
@@ -60,8 +62,10 @@ public partial class App : Application
         _tray.MenuRequested += _menu.Show;
         _tray.SettingsRequested += OpenSettings;
 
+        TrySafe(() => StartupRegistration.Apply(Settings.Behavior.RunAtStartup), "startup registration");
+
         Log.Info("Started");
-        OnStartupCore(e);
+        TrySafe(() => OnStartupCore(e), "startup");
     }
 
     /// <summary>Extended by later tasks (widget + monitor wiring).</summary>

@@ -137,6 +137,18 @@ public class UsageMonitorTests
     }
 
     [Fact]
+    public async Task ClientExceptionBecomesFailureWithBackoff()
+    {
+        _creds.State = ValidCreds(T0);
+        _client.Throw = new IOException("connection reset");
+        await _monitor.TickAsync(CancellationToken.None);
+        Assert.Equal(UsageStatus.Loading, _monitor.State.Status);
+        Assert.Equal("connection reset", _monitor.State.Message);
+        Assert.Equal(TimeSpan.FromSeconds(15), _scheduler.CurrentBackoff);
+        Assert.False(_scheduler.IsDue(T0));
+    }
+
+    [Fact]
     public async Task ConcurrentRefreshIsIgnored()
     {
         _creds.State = ValidCreds(T0);

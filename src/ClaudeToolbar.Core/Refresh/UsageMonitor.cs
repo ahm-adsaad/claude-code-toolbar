@@ -66,7 +66,19 @@ public sealed class UsageMonitor
                     Publish(State with { Status = UsageStatus.Expired, Message = "Login expired", Credentials = creds });
                     return;
                 case CredentialsState.Valid valid:
-                    var result = await _client.FetchAsync(valid.AccessToken, cancellationToken).ConfigureAwait(false);
+                    UsageResult result;
+                    try
+                    {
+                        result = await _client.FetchAsync(valid.AccessToken, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        result = new UsageResult.Failed(ex.Message);
+                    }
                     Apply(result, creds);
                     return;
             }
