@@ -80,7 +80,11 @@ public partial class App
     public void ApplySettingsLive()
     {
         _theme = WidgetTheme.FromSettings(Settings.Appearance);
-        if (_monitor is not null) _monitor.Scheduler.IntervalSeconds = Settings.Behavior.RefreshIntervalSeconds;
+        if (_monitor is not null && _monitor.Scheduler.IntervalSeconds != Settings.Behavior.RefreshIntervalSeconds)
+        {
+            _monitor.Scheduler.IntervalSeconds = Settings.Behavior.RefreshIntervalSeconds;
+            _monitor.RequestRefresh();
+        }
         if (_startupApplied != Settings.Behavior.RunAtStartup)
         {
             _startupApplied = Settings.Behavior.RunAtStartup;

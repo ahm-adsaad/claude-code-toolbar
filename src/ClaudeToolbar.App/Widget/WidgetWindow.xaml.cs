@@ -92,6 +92,7 @@ public partial class WidgetWindow : Window
 
     public void HideWidget()
     {
+        HideFlyout();
         if (!IsShown) return;
         Hide();
         IsShown = false;

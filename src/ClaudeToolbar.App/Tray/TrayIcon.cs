@@ -5,15 +5,17 @@ namespace ClaudeToolbar.App.Tray;
 public sealed class TrayIcon : IDisposable
 {
     private readonly WinForms.NotifyIcon _icon;
+    private readonly System.Drawing.Icon _image;
 
     public event Action? MenuRequested;
     public event Action? SettingsRequested;
 
     public TrayIcon(string tooltip)
     {
+        _image = IconLoader.LoadAppIcon(WinForms.SystemInformation.SmallIconSize.Width);
         _icon = new WinForms.NotifyIcon
         {
-            Icon = IconLoader.LoadAppIcon(WinForms.SystemInformation.SmallIconSize.Width),
+            Icon = _image,
             Text = Truncate(tooltip),
             Visible = true,
         };
@@ -32,5 +34,6 @@ public sealed class TrayIcon : IDisposable
     {
         _icon.Visible = false;
         _icon.Dispose();
+        _image.Dispose();
     }
 }
