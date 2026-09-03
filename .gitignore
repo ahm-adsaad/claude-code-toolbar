@@ -14,3 +14,4 @@ TestResults/
 # Local
 *.log
 .claude/
+docs/superpowers/
