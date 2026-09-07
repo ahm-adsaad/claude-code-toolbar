@@ -170,7 +170,7 @@ public partial class App
         try
         {
             var current = File.Exists(path) ? File.ReadAllText(path) : string.Empty;
-            if (File.Exists(path)) File.Copy(path, path + ".claudetoolbar-bak", overwrite: true);
+            if (File.Exists(path)) WriteBackup(path, path + ".claudetoolbar-bak");
             var updated = edit(current);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllText(path + ".tmp", updated);
@@ -187,6 +187,25 @@ public partial class App
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return ex.Message;
+        }
+    }
+
+    /// <summary>
+    /// Copies to a sibling temp file and moves it into place, so a copy that fails part way through
+    /// leaves the previous backup intact instead of a truncated one.
+    /// </summary>
+    private static void WriteBackup(string path, string backup)
+    {
+        var staged = backup + ".tmp";
+        try
+        {
+            File.Copy(path, staged, overwrite: true);
+            File.Move(staged, backup, overwrite: true);
+        }
+        catch
+        {
+            try { File.Delete(staged); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            throw;
         }
     }
 

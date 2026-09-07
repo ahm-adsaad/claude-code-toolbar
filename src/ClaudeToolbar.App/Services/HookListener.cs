@@ -126,6 +126,11 @@ public sealed class HookListener : IDisposable
                     if (line.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
                         _ = int.TryParse(line["Content-Length:".Length..].Trim(), out contentLength);
                 }
+                if (contentLength < 0)
+                {
+                    await RespondAsync(stream, "400 Bad Request", "");
+                    return;
+                }
                 if (contentLength > MaxBodyBytes)
                 {
                     await RespondAsync(stream, "413 Payload Too Large", "");
@@ -135,7 +140,18 @@ public sealed class HookListener : IDisposable
                 var bodyStart = headerEnd + 4;
                 while (total - bodyStart < contentLength)
                 {
-                    var read = await stream.ReadAsync(buffer.AsMemory(total), timeout.Token);
+                    int read;
+                    try
+                    {
+                        read = await stream.ReadAsync(buffer.AsMemory(total), timeout.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        if (ct.IsCancellationRequested) return;
+                        // The client stalled mid-body; tell it so rather than leaving it waiting.
+                        await RespondAsync(stream, "400 Bad Request", "");
+                        return;
+                    }
                     if (read == 0) break;
                     total += read;
                 }

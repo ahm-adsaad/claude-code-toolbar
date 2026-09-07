@@ -32,5 +32,5 @@ Run with a Release build: `dotnet publish src/ClaudeToolbar.App -c Release -r wi
 | 26 | Mascot off and reduce motion | Mascot = "Off" hides Clawd and the rows shift left; with Settings → Accessibility → Visual effects → Animation effects off he never animates | |
 | 27 | Hooks install | Settings → Notifications → Install Claude Code hooks: status says installed; `%USERPROFILE%\.claude\settings.json` gains six `http` hooks pointing at `http://127.0.0.1:47831/hook`; `settings.json.claudetoolbar-bak` exists next to it | |
 | 28 | Needs-you cue | In a terminal run `claude` in a project and ask it to run a command that needs permission: within a second Clawd's badge blinks amber, he waves, a two-note chime plays, and hovering the widget shows "1 session · needs you (project)" | |
-| 29 | Finished cue | Answer the prompt and let Claude finish: badge turns green with a single soft chime; hover the widget: badge disappears | |
+| 29 | Finished cue | Answer the prompt and let Claude finish: badge turns green with a single soft chime; hover the widget: the flyout shows "1 session · finished (project)"; move the mouse away and the badge disappears | |
 | 30 | Sound off and remove | Settings → untick "Play a chime": repeat 28 with no sound; Remove hooks: status says not installed and the six hooks are gone from settings.json | |

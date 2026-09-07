@@ -29,6 +29,8 @@ public class SessionTrackerTests
         Assert.Equal("01234567", t.Sessions[0].Name);
         t.Apply(Ev(SessionEventKind.Start, id: "0123456789abcdef", cwd: "/home/u/proj/"), T0);
         Assert.Equal("proj", t.Sessions[0].Name);
+        t.Apply(Ev(SessionEventKind.Start, id: "0123456789abcdef", cwd: " /x/y "), T0);
+        Assert.Equal("y", t.Sessions[0].Name);
     }
 
     [Fact]

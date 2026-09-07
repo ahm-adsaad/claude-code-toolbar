@@ -93,10 +93,12 @@ public class HooksConfigTests
     }
 
     [Fact]
-    public void AcceptsCommentsAndTrailingCommasButRejectsGarbage()
+    public void RejectsCommentsTrailingCommasAndGarbage()
     {
-        var json = HooksConfig.Install("{ // user settings\n \"model\": \"opus\", }", Url);
-        Assert.True(HooksConfig.IsInstalled(json, Url));
+        // Rewriting a commented settings file would drop the user's comments, and the macOS
+        // build refuses such a file outright; both platforms now say so instead.
+        Assert.Throws<JsonException>(() => HooksConfig.Install("{ // user settings\n \"model\": \"opus\" }", Url));
+        Assert.Throws<JsonException>(() => HooksConfig.Install("{ \"model\": \"opus\", }", Url));
         Assert.Throws<JsonException>(() => HooksConfig.Install("{ nope", Url));
         Assert.Throws<JsonException>(() => HooksConfig.Install("[]", Url));
     }

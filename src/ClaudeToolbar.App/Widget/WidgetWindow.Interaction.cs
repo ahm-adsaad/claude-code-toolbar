@@ -30,6 +30,9 @@ public partial class WidgetWindow
     public event Action? FlyoutRequested;
     public event Action? HoverStarted;
 
+    /// <summary>Raised when a flyout that was on screen is dismissed — the user has read it by then.</summary>
+    public event Action? FlyoutHidden;
+
     public bool IsFlyoutOpen => _flyout.IsOpen;
 
     private void InitializeInteraction()
@@ -92,5 +95,10 @@ public partial class WidgetWindow
         _flyout.IsOpen = true;
     }
 
-    public void HideFlyout() => _flyout.IsOpen = false;
+    public void HideFlyout()
+    {
+        if (!_flyout.IsOpen) return;
+        _flyout.IsOpen = false;
+        FlyoutHidden?.Invoke();
+    }
 }

@@ -12,7 +12,6 @@ public static class HooksConfig
     public const int HookTimeoutSeconds = 5;
 
     private static readonly JsonSerializerOptions Pretty = new() { WriteIndented = true };
-    private static readonly JsonDocumentOptions Lenient = new() { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true };
 
     public static string HookUrl(int port) => $"http://127.0.0.1:{port}/hook";
 
@@ -78,14 +77,18 @@ public static class HooksConfig
     private static string? StringOf(JsonNode? node) =>
         node is JsonValue value && value.TryGetValue<string>(out var s) ? s : null;
 
-    /// <summary>Blank input is an empty document. Throws <see cref="JsonException"/> when the text is not a JSON object.</summary>
+    /// <summary>
+    /// Blank input is an empty document. Throws <see cref="JsonException"/> when the text is not a JSON object.
+    /// Strict on purpose: comments and trailing commas are rejected rather than silently rewritten away,
+    /// which is what the macOS build does with the same file.
+    /// </summary>
     private static JsonObject ParseObject(string json)
     {
         if (string.IsNullOrWhiteSpace(json)) return new JsonObject();
         JsonNode? node;
         try
         {
-            node = JsonNode.Parse(json, documentOptions: Lenient);
+            node = JsonNode.Parse(json);
         }
         catch (JsonException ex) when (ex.GetType() != typeof(JsonException))
         {

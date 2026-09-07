@@ -63,8 +63,10 @@ public partial class App
         _widget.Clicked += AcknowledgeSessions;
         _widget.Clicked += OpenSettings;
         _widget.MenuRequested += () => _menu?.Show();
-        _widget.FlyoutRequested += AcknowledgeSessions;
         _widget.FlyoutRequested += ShowFlyout;
+        // Acknowledged once the flyout goes away, not when it opens: clearing the badge first
+        // would leave the hovering user reading a line that has already been reset to idle.
+        _widget.FlyoutHidden += AcknowledgeSessions;
         _controller = new WidgetController(_widget, new TaskbarTracker(_widget), () => Settings);
         _theme = WidgetTheme.FromSettings(Settings.Appearance);
         RenderWidget(_monitor.State);

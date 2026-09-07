@@ -118,7 +118,7 @@ public sealed class SessionTracker
     {
         if (!string.IsNullOrWhiteSpace(e.Cwd))
         {
-            var trimmed = e.Cwd.TrimEnd('/', '\\');
+            var trimmed = e.Cwd.Trim().TrimEnd('/', '\\');
             var cut = Math.Max(trimmed.LastIndexOf('/'), trimmed.LastIndexOf('\\'));
             var leaf = cut >= 0 ? trimmed[(cut + 1)..] : trimmed;
             if (leaf.Length > 0) return leaf;
