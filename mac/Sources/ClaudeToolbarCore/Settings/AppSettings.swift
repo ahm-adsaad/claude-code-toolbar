@@ -76,18 +76,36 @@ public struct BehaviorSettings: Codable, Equatable, Sendable {
     }
 }
 
+public struct NotificationSettings: Codable, Equatable, Sendable {
+    public var enabled = true
+    public var port = 47831
+    public var sound = true
+
+    public init() {}
+
+    private enum CodingKeys: String, CodingKey { case enabled, port, sound }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? enabled
+        port = try c.decodeIfPresent(Int.self, forKey: .port) ?? port
+        sound = try c.decodeIfPresent(Bool.self, forKey: .sound) ?? sound
+    }
+}
+
 public struct AppSettings: Codable, Equatable, Sendable {
     public var version = 1
     public var appearance = AppearanceSettings()
     public var rows = RowSettings()
     public var behavior = BehaviorSettings()
+    public var notifications = NotificationSettings()
 
     public init() {}
 
     public static func createDefault() -> AppSettings { AppSettings() }
 
     private enum CodingKeys: String, CodingKey {
-        case version, appearance, rows, behavior
+        case version, appearance, rows, behavior, notifications
     }
 
     public init(from decoder: Decoder) throws {
@@ -96,6 +114,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         appearance = try c.decodeIfPresent(AppearanceSettings.self, forKey: .appearance) ?? appearance
         rows = try c.decodeIfPresent(RowSettings.self, forKey: .rows) ?? rows
         behavior = try c.decodeIfPresent(BehaviorSettings.self, forKey: .behavior) ?? behavior
+        notifications = try c.decodeIfPresent(NotificationSettings.self, forKey: .notifications) ?? notifications
     }
 }
 

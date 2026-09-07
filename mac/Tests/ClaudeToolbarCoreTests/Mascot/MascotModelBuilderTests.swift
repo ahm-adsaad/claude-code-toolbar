@@ -2,14 +2,13 @@ import XCTest
 @testable import ClaudeToolbarCore
 
 final class MascotModelBuilderTests: XCTestCase {
-    private func status(dimmed: Bool = false, _ levels: BarLevel...) -> StatusItemModel {
-        StatusItemModel(rows: levels.enumerated().map { i, level in
-            StatusRow(label: "r\(i)", utilization: 10, percentText: "10%", timeText: "", level: level, hasData: true)
-        }, dimmed: dimmed, showStaleDot: false, notice: nil, hint: nil)
+    private func status(dimmed: Bool = false) -> StatusItemModel {
+        StatusItemModel(rows: [StatusRow(label: "5h", utilization: 10, percentText: "10%", timeText: "", level: .ok, hasData: true)],
+                        dimmed: dimmed, showStaleDot: false, notice: nil, hint: nil)
     }
 
     func testOffModeHidesTheMascot() {
-        XCTAssertEqual(MascotModelBuilder.build(status: status(.ok), mascotMode: "off", armAngle: 12), .hidden)
+        XCTAssertEqual(MascotModelBuilder.build(status: status(), mascotMode: "off", armAngle: 12, badge: .attention), .hidden)
     }
 
     func testNoticeWithoutRowsHidesTheMascot() {
@@ -17,22 +16,18 @@ final class MascotModelBuilderTests: XCTestCase {
         XCTAssertEqual(MascotModelBuilder.build(status: notice, mascotMode: "full", armAngle: 12), .hidden)
     }
 
-    func testWorstLevelWinsAndArmAnglePassesThrough() {
-        let m = MascotModelBuilder.build(status: status(.ok, .crit, .warn), mascotMode: "full", armAngle: 33)
+    func testArmAngleBadgeAndDimmingPassThrough() {
+        let m = MascotModelBuilder.build(status: status(dimmed: true), mascotMode: "hover", armAngle: 33, badge: .finished, badgeLit: false)
         XCTAssertTrue(m.visible)
-        XCTAssertEqual(m.level, .crit)
         XCTAssertEqual(m.armAngle, 33)
-        XCTAssertFalse(m.dimmed)
-    }
-
-    func testHoverModeIsVisibleAndDimmedFollowsTheWidget() {
-        let m = MascotModelBuilder.build(status: status(dimmed: true, .ok), mascotMode: "hover", armAngle: WaveAnimation.restAngle)
-        XCTAssertTrue(m.visible)
-        XCTAssertEqual(m.level, .ok)
         XCTAssertTrue(m.dimmed)
+        XCTAssertEqual(m.badge, .finished)
+        XCTAssertFalse(m.badgeLit)
     }
 
-    func testUnknownModeBehavesLikeFull() {
-        XCTAssertTrue(MascotModelBuilder.build(status: status(.ok), mascotMode: "sparkles", armAngle: 0).visible)
+    func testDefaultsAreNoBadgeAndLit() {
+        let m = MascotModelBuilder.build(status: status(), mascotMode: "full", armAngle: WaveAnimation.restAngle)
+        XCTAssertEqual(m.badge, MascotBadge.none)
+        XCTAssertTrue(m.badgeLit)
     }
 }

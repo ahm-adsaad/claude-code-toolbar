@@ -36,6 +36,8 @@ public enum SettingsValidator {
         s.behavior.refreshIntervalSeconds = min(max(s.behavior.refreshIntervalSeconds, 30), 300)
         s.behavior.mascot = MascotMode.normalize(s.behavior.mascot)
 
+        s.notifications.port = min(max(s.notifications.port, 1024), 65535)
+
         s.version = 1
         return s
     }

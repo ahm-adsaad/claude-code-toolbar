@@ -4,6 +4,9 @@ public enum MascotCue: Int, Comparable, Sendable {
     case hover
     case warn
     case crit
+    case finished
+    case failed
+    case attention
 
     public static func < (lhs: MascotCue, rhs: MascotCue) -> Bool { lhs.rawValue < rhs.rawValue }
 }
