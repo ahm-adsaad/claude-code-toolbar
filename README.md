@@ -1,8 +1,10 @@
 # Claude Toolbar
 
-A small Windows 11 taskbar widget and macOS menu bar app that shows your Claude subscription usage: the 5-hour session window and the 7-day weekly window, each with the percentage used and the time until it resets. It sits in the taskbar just left of the notification area, follows the taskbar across monitors and display scaling, refreshes itself, and is customisable from a built-in settings window.
+A small Windows 11 taskbar widget and macOS menu bar app that shows your Claude subscription usage: the 5-hour session window and the 7-day weekly window, each with the percentage used and the time until it resets. On Windows it sits in the taskbar just left of the notification area and follows the taskbar across monitors and display scaling; on macOS it is a menu bar item with a popover. Both refresh themselves and are customisable from a built-in settings window.
 
-## What it shows
+## Windows
+
+### What it shows
 
 ```
 5h ▮▮▮▮▮▯▯▯▯▯ 42%  2h 13m
@@ -13,17 +15,17 @@ A small Windows 11 taskbar widget and macOS menu bar app that shows your Claude 
 - Hover for exact reset times and the last update time. Left-click opens settings. Right-click for refresh / settings / run at startup / exit.
 - Optional rows for the per-model weekly limits (Opus, Sonnet) on plans that report them.
 
-## How it signs in
+### How it signs in
 
 Claude Toolbar does not have its own login. It reads the credentials that Claude Code stores at `%USERPROFILE%\.claude\.credentials.json` (or `%CLAUDE_CONFIG_DIR%`) and calls Anthropic's read-only usage endpoint with that token. It never writes that file and never refreshes the token. If you have not run Claude Code for about eight hours the token expires; the widget dims and shows `↻ run claude` until you run `claude` again.
 
-## Install and run
+### Install and run
 
 1. Download `ClaudeToolbar.exe` from the latest build artifact (Actions → build → ClaudeToolbar-win-x64) or build it yourself (below). The exe is not code-signed, so Windows SmartScreen may show "Windows protected your PC" the first time; choose "More info" then "Run anyway". The single-file build is around 70 MB.
 2. Run it. The widget appears in the taskbar and an icon appears in the tray. "Run at startup" is on by default; turn it off from the menu or settings.
 3. Make sure you have signed in to Claude Code at least once on this machine (`claude` in a terminal).
 
-## Settings
+### Settings
 
 Open from the widget, the tray icon, or by launching the exe a second time.
 
@@ -33,6 +35,23 @@ Open from the widget, the tray icon, or by launching the exe a second time.
 - Account: which credentials file is in use and the login state.
 
 Settings live in `%APPDATA%\ClaudeToolbar\settings.json`. Logs live in `%LOCALAPPDATA%\ClaudeToolbar\logs\app.log`. If something looks wrong, the log file is the first place to look; run `ClaudeToolbar.exe --dump-taskbar` to write the taskbar rectangles it detected to `%LOCALAPPDATA%\ClaudeToolbar\logs\taskbar-dump.txt`.
+
+### Build from source
+
+Requires the .NET 10 SDK.
+
+```
+dotnet test
+dotnet publish src/ClaudeToolbar.App -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+```
+
+`publish\ClaudeToolbar.exe` is a single self-contained executable.
+
+### Limitations
+
+- The widget is an overlay, not a reserved taskbar region. With a left-aligned, very full taskbar it can overlap the rightmost task button.
+- Primary taskbar only; secondary-monitor taskbars are not supported.
+- Windows 11 only.
 
 ## macOS
 
@@ -48,7 +67,7 @@ If macOS ever shows a Keychain prompt for ClaudeToolbar, choose **Always Allow**
 
 Requires macOS 14 or newer (Apple Silicon or Intel).
 
-1. Download `ClaudeToolbar-mac.zip` from the latest `mac` workflow run (Actions → mac → ClaudeToolbar-mac) and unzip it.
+1. Download `ClaudeToolbar-mac.zip` from the latest `mac` workflow run (Actions → mac → the newest run → Artifacts → ClaudeToolbar-mac). GitHub wraps every artifact in a second zip: unzip the download, then unzip the `ClaudeToolbar-mac.zip` inside it to get `ClaudeToolbar.app`.
 2. The app is not notarized, so macOS blocks it on first launch. Remove the quarantine flag once:
    ```
    xattr -dr com.apple.quarantine ClaudeToolbar.app
@@ -68,23 +87,6 @@ bash scripts/build-app.sh
 ```
 
 `build/ClaudeToolbar.app` is the app bundle; `build/ClaudeToolbar-mac.zip` is the same thing zipped. `build/ClaudeToolbar.app/Contents/MacOS/ClaudeToolbar --snapshot out` renders every view with sample data to PNG files in `out`, which is how the UI is reviewed in CI.
-
-## Build from source
-
-Requires the .NET 10 SDK.
-
-```
-dotnet test
-dotnet publish src/ClaudeToolbar.App -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
-```
-
-`publish\ClaudeToolbar.exe` is a single self-contained executable.
-
-## Limitations
-
-- The widget is an overlay, not a reserved taskbar region. With a left-aligned, very full taskbar it can overlap the rightmost task button.
-- Primary taskbar only; secondary-monitor taskbars are not supported.
-- Windows 11 only.
 
 ## Project layout
 
