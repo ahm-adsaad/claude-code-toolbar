@@ -1,4 +1,4 @@
-# Manual verification checklist
+# Manual verification checklist (Windows)
 
 Run with a Release build: `dotnet publish src/ClaudeToolbar.App -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish` then start `publish\ClaudeToolbar.exe`.
 
