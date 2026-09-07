@@ -1,6 +1,6 @@
 # Claude Toolbar
 
-A small Windows 11 taskbar widget that shows your Claude subscription usage: the 5-hour session window and the 7-day weekly window, each with the percentage used and the time until it resets. It sits in the taskbar just left of the notification area, follows the taskbar across monitors and display scaling, refreshes itself, and is customisable from a built-in settings window.
+A small Windows 11 taskbar widget and macOS menu bar app that shows your Claude subscription usage: the 5-hour session window and the 7-day weekly window, each with the percentage used and the time until it resets. It sits in the taskbar just left of the notification area, follows the taskbar across monitors and display scaling, refreshes itself, and is customisable from a built-in settings window.
 
 ## What it shows
 
@@ -34,6 +34,41 @@ Open from the widget, the tray icon, or by launching the exe a second time.
 
 Settings live in `%APPDATA%\ClaudeToolbar\settings.json`. Logs live in `%LOCALAPPDATA%\ClaudeToolbar\logs\app.log`. If something looks wrong, the log file is the first place to look; run `ClaudeToolbar.exe --dump-taskbar` to write the taskbar rectangles it detected to `%LOCALAPPDATA%\ClaudeToolbar\logs\taskbar-dump.txt`.
 
+## macOS
+
+The macOS version is a menu bar item showing the same two windows as compact bars with percentages: `5h ▬▬▬ 42%  7d ▬ 18%`. Click it for the full detail (reset countdowns and clock times, per-model windows if enabled, account state), right-click for a menu. Settings open in a window with a live preview.
+
+### How it signs in
+
+It reads the login that Claude Code stores in your Keychain (service `Claude Code-credentials`) through the same `security` tool Claude Code uses, so no permission prompt appears. If that item is missing it falls back to `~/.claude/.credentials.json` (or `$CLAUDE_CONFIG_DIR`). It never writes the Keychain or that file and never refreshes the token. If you have not run Claude Code for about eight hours the token expires; the item dims and shows `↻ run claude` until you run `claude` again.
+
+If macOS ever shows a Keychain prompt for ClaudeToolbar, choose **Always Allow**.
+
+### Install and run
+
+Requires macOS 14 or newer (Apple Silicon or Intel).
+
+1. Download `ClaudeToolbar-mac.zip` from the latest `mac` workflow run (Actions → mac → ClaudeToolbar-mac) and unzip it.
+2. The app is not notarized, so macOS blocks it on first launch. Remove the quarantine flag once:
+   ```
+   xattr -dr com.apple.quarantine ClaudeToolbar.app
+   ```
+   Alternatively open it, dismiss the warning, then go to System Settings → Privacy & Security and click **Open Anyway**.
+3. Move `ClaudeToolbar.app` to Applications and open it. The item appears in the menu bar; there is no Dock icon.
+4. Make sure you have signed in to Claude Code at least once on this Mac (`claude` in a terminal).
+
+Launch at login is on by default and can be turned off in the popover or in Settings. Logs are in `~/Library/Logs/ClaudeToolbar/app.log`; settings in `~/Library/Application Support/ClaudeToolbar/settings.json`.
+
+### Build from source (macOS)
+
+```
+cd mac
+swift test
+bash scripts/build-app.sh
+```
+
+`build/ClaudeToolbar.app` is the app bundle; `build/ClaudeToolbar-mac.zip` is the same thing zipped. `build/ClaudeToolbar.app/Contents/MacOS/ClaudeToolbar --snapshot out` renders every view with sample data to PNG files in `out`, which is how the UI is reviewed in CI.
+
 ## Build from source
 
 Requires the .NET 10 SDK.
@@ -56,3 +91,5 @@ dotnet publish src/ClaudeToolbar.App -c Release -r win-x64 --self-contained -p:P
 - `src/ClaudeToolbar.Core` — platform-free logic: credentials reading, usage API client, refresh scheduling, formatting, settings, widget model. Fully unit-tested.
 - `src/ClaudeToolbar.App` — WPF shell: the taskbar widget, tray icon, settings window and Win32 interop.
 - `tests/ClaudeToolbar.Core.Tests` — xUnit tests for Core.
+- `mac/Sources/ClaudeToolbarCore` — the same logic ported to Swift (Foundation only; builds and tests on macOS, Linux and Windows).
+- `mac/Sources/ClaudeToolbar` — the macOS menu bar app: status item renderer, popover, settings window, Keychain reader, snapshot mode.
