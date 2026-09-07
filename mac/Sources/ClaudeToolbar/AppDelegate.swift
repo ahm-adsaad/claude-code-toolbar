@@ -8,6 +8,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var controller: StatusItemController!
     private var menu: AppMenu!
     private var popover: PopoverController!
+    private var settingsWindow: SettingsWindowController?
+    private var settingsModel: SettingsModel?
     private var wakeObserver: WakeObserver?
     private var networkObserver: NetworkObserver?
     private var openSettingsObserver: NSObjectProtocol?
@@ -70,6 +72,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.onLeftClick = { [weak self] in self?.togglePopover() }
         controller.onRightClick = { [weak self] in self?.showMenu() }
         controller.onRender = { [weak self] in self?.updatePopover() }
+        controller.onStateChanged = { [weak self] state in
+            self?.settingsModel?.account = state
+        }
 
         wakeObserver = WakeObserver { [weak self] in
             Log.info("Woke from sleep")
@@ -88,6 +93,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        settingsModel?.flushPendingSave()
         Log.info("ClaudeToolbar exiting")
         Log.flush()
     }
@@ -115,24 +121,55 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Calendar.current.isDateInToday(date) ? timeFormatter.string(from: date) : dayTimeFormatter.string(from: date)
     }
 
-    /// The settings window arrives in Task 14; until then a request is only logged.
     private func openSettings() {
-        Log.info("Settings requested")
+        if settingsWindow == nil {
+            let model = SettingsModel(
+                settings: settings,
+                account: controller.state,
+                launchAtLoginStatus: LaunchAtLogin.statusDescription,
+                onApply: { [weak self] updated in self?.applySettings(updated) },
+                onSave: { [weak self] updated in self?.persistSettings(updated) },
+                onRefresh: { [weak self] in self?.controller.requestRefresh() })
+            settingsModel = model
+            settingsWindow = SettingsWindowController(model: model)
+        }
+        settingsModel?.account = controller.state
+        settingsModel?.launchAtLoginStatus = LaunchAtLogin.statusDescription
+        settingsWindow?.show()
+    }
+
+    private func applySettings(_ updated: AppSettings) {
+        let launchChanged = updated.behavior.launchAtLogin != settings.behavior.launchAtLogin
+        settings = updated
+        if launchChanged {
+            LaunchAtLogin.apply(updated.behavior.launchAtLogin)
+            settingsModel?.launchAtLoginStatus = LaunchAtLogin.statusDescription
+        }
+        controller.updateSettings(settings)
+        updatePopover()
+    }
+
+    private func persistSettings(_ updated: AppSettings) {
+        do {
+            try settingsStore.save(updated)
+        } catch {
+            Log.error("Could not save settings: \(error.localizedDescription)")
+        }
     }
 
     private func setLaunchAtLogin(_ enabled: Bool) {
         guard settings.behavior.launchAtLogin != enabled else { return }
-        settings.behavior.launchAtLogin = enabled
-        LaunchAtLogin.apply(enabled)
-        saveSettings()
+        if let model = settingsModel {
+            model.settings.behavior.launchAtLogin = enabled   // flows back through onApply/onSave
+        } else {
+            settings.behavior.launchAtLogin = enabled
+            LaunchAtLogin.apply(enabled)
+            saveSettings()
+        }
     }
 
     func saveSettings() {
-        do {
-            try settingsStore.save(settings)
-        } catch {
-            Log.error("Could not save settings: \(error.localizedDescription)")
-        }
+        persistSettings(settings)
         controller.updateSettings(settings)
         updatePopover()
     }

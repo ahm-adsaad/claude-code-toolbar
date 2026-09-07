@@ -11,6 +11,7 @@ enum SnapshotRunner {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try writeStatusItems(to: directory)
         try writePopovers(to: directory)
+        try writeSettings(to: directory)
         print("snapshots written to \(directory.path)")
     }
 
@@ -76,5 +77,20 @@ enum SnapshotRunner {
         try ViewSnapshot.write(try ViewSnapshot.pngData(view: view(.stale), appearance: .darkAqua), to: directory, name: "popover-stale-dark.png")
         try ViewSnapshot.write(try ViewSnapshot.pngData(view: view(.expired), appearance: .darkAqua), to: directory, name: "popover-expired-dark.png")
         try ViewSnapshot.write(try ViewSnapshot.pngData(view: view(.noCredentials, snapshot: nil), appearance: .darkAqua), to: directory, name: "popover-nocreds-dark.png")
+    }
+
+    static func writeSettings(to directory: URL) throws {
+        let defaults = SettingsValidator.normalize(AppSettings.createDefault())
+        let size = NSSize(width: 440, height: 620)
+        for (name, appearance, status) in [
+            ("settings-light.png", NSAppearance.Name.aqua, UsageStatus.ok),
+            ("settings-dark.png", NSAppearance.Name.darkAqua, UsageStatus.ok),
+            ("settings-expired-dark.png", NSAppearance.Name.darkAqua, UsageStatus.expired),
+        ] {
+            let model = SettingsModel(settings: defaults, account: SampleData.state(status), launchAtLoginStatus: "enabled",
+                                      onApply: { _ in }, onSave: { _ in }, onRefresh: {})
+            let data = try ViewSnapshot.pngData(view: SettingsView(model: model), appearance: appearance, size: size)
+            try ViewSnapshot.write(data, to: directory, name: name)
+        }
     }
 }
