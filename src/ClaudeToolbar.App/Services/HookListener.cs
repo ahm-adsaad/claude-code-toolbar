@@ -10,6 +10,7 @@ public sealed class HookListener : IDisposable
 {
     public const int MaxBodyBytes = 64 * 1024;
     private static readonly TimeSpan ReadTimeout = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan WriteTimeout = TimeSpan.FromSeconds(1);
 
     private TcpListener? _listener;
     private CancellationTokenSource? _cts;
@@ -90,14 +91,23 @@ public sealed class HookListener : IDisposable
                 var headerEnd = -1;
                 while (headerEnd < 0 && total < buffer.Length)
                 {
-                    var read = await stream.ReadAsync(buffer.AsMemory(total), timeout.Token);
+                    int read;
+                    try
+                    {
+                        read = await stream.ReadAsync(buffer.AsMemory(total), timeout.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        if (ct.IsCancellationRequested) return;
+                        break; // The client stalled mid-header; fall through and tell it so.
+                    }
                     if (read == 0) break;
                     total += read;
                     headerEnd = IndexOfHeaderEnd(buffer, total);
                 }
                 if (headerEnd < 0)
                 {
-                    await RespondAsync(stream, "400 Bad Request", "", timeout.Token);
+                    await RespondAsync(stream, "400 Bad Request", "");
                     return;
                 }
 
@@ -105,7 +115,7 @@ public sealed class HookListener : IDisposable
                 var request = lines[0].Split(' ');
                 if (request.Length < 2)
                 {
-                    await RespondAsync(stream, "400 Bad Request", "", timeout.Token);
+                    await RespondAsync(stream, "400 Bad Request", "");
                     return;
                 }
                 var method = request[0];
@@ -118,7 +128,7 @@ public sealed class HookListener : IDisposable
                 }
                 if (contentLength > MaxBodyBytes)
                 {
-                    await RespondAsync(stream, "413 Payload Too Large", "", timeout.Token);
+                    await RespondAsync(stream, "413 Payload Too Large", "");
                     return;
                 }
 
@@ -135,15 +145,15 @@ public sealed class HookListener : IDisposable
                 if (method == "POST" && path == "/hook")
                 {
                     HookReceived?.Invoke(body);
-                    await RespondAsync(stream, "200 OK", "", timeout.Token);
+                    await RespondAsync(stream, "200 OK", "");
                 }
                 else if (method == "GET" && path == "/health")
                 {
-                    await RespondAsync(stream, "200 OK", "ClaudeToolbar " + AppVersion(), timeout.Token);
+                    await RespondAsync(stream, "200 OK", "ClaudeToolbar " + AppVersion());
                 }
                 else
                 {
-                    await RespondAsync(stream, "404 Not Found", "", timeout.Token);
+                    await RespondAsync(stream, "404 Not Found", "");
                 }
             }
             catch (Exception ex) when (ex is IOException or OperationCanceledException or SocketException or ObjectDisposedException)
@@ -157,13 +167,16 @@ public sealed class HookListener : IDisposable
         }
     }
 
-    private static async Task RespondAsync(NetworkStream stream, string status, string body, CancellationToken ct)
+    // Deliberately not the read timeout's token: a client that stalled mid-header has already expired it,
+    // and the reply — a 400 — is exactly what that client needs to see before the socket closes.
+    private static async Task RespondAsync(NetworkStream stream, string status, string body)
     {
+        using var write = new CancellationTokenSource(WriteTimeout);
         var bytes = Encoding.UTF8.GetBytes(body);
         var header = $"HTTP/1.1 {status}\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {bytes.Length}\r\nConnection: close\r\n\r\n";
-        await stream.WriteAsync(Encoding.ASCII.GetBytes(header), ct);
-        if (bytes.Length > 0) await stream.WriteAsync(bytes, ct);
-        await stream.FlushAsync(ct);
+        await stream.WriteAsync(Encoding.ASCII.GetBytes(header), write.Token);
+        if (bytes.Length > 0) await stream.WriteAsync(bytes, write.Token);
+        await stream.FlushAsync(write.Token);
     }
 
     private static int IndexOfHeaderEnd(byte[] buffer, int length)

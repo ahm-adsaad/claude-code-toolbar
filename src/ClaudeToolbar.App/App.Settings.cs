@@ -13,6 +13,7 @@ public partial class App
 
     partial void OpenSettingsCore()
     {
+        RefreshHooksInstalled();
         if (_settingsWindow is { IsLoaded: true })
         {
             if (_settingsWindow.WindowState == WindowState.Minimized) _settingsWindow.WindowState = WindowState.Normal;

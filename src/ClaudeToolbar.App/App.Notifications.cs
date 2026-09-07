@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using System.Windows.Threading;
 using ClaudeToolbar.App.Services;
 using ClaudeToolbar.Core.Credentials;
 using ClaudeToolbar.Core.Mascot;
@@ -9,10 +10,17 @@ namespace ClaudeToolbar.App;
 
 public partial class App
 {
+    private const string TestSessionId = "test-session";
+    private static readonly TimeSpan TestSessionLifetime = TimeSpan.FromSeconds(10);
+
     private readonly SessionTracker _sessions = new();
     private HookListener? _hooks;
     private ChimePlayer? _chime;
+    private DispatcherTimer? _testSessionTimer;
     private DateTime _lastPrune = DateTime.UtcNow;
+    private bool _hooksInstalled;
+    private bool? _listenerEnabled;
+    private int? _listenerPort;
 
     /// <summary>Raised on the UI thread whenever listener state, hooks state or sessions change.</summary>
     public event Action? NotificationsChanged;
@@ -28,18 +36,27 @@ public partial class App
 
     public string ClaudeSettingsPath => CredentialsPaths.ClaudeSettingsPathFromEnvironment();
 
-    public bool HooksInstalled
+    /// <summary>Cached: reading the settings file on every hook event would hit the disk dozens of times a minute.</summary>
+    public bool HooksInstalled => _hooksInstalled;
+
+    /// <summary>Re-reads the Claude Code settings file. Called on install/remove, on a port change and when the settings window opens.</summary>
+    public void RefreshHooksInstalled()
     {
-        get
+        var installed = ReadHooksInstalled();
+        if (installed == _hooksInstalled) return;
+        _hooksInstalled = installed;
+        NotificationsChanged?.Invoke();
+    }
+
+    private bool ReadHooksInstalled()
+    {
+        try
         {
-            try
-            {
-                return File.Exists(ClaudeSettingsPath) && HooksConfig.IsInstalled(File.ReadAllText(ClaudeSettingsPath), HookUrl);
-            }
-            catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
-            {
-                return false;
-            }
+            return File.Exists(ClaudeSettingsPath) && HooksConfig.IsInstalled(File.ReadAllText(ClaudeSettingsPath), HookUrl);
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        {
+            return false;
         }
     }
 
@@ -55,25 +72,33 @@ public partial class App
             _hooks = new HookListener();
             _hooks.HookReceived += body => Dispatcher.InvokeAsync(() => HandleHookBody(body));
         }
+        _hooksInstalled = ReadHooksInstalled();
         ApplyListenerSettings();
     }
 
+    /// <summary>
+    /// Binds or unbinds only when the user actually changed the switch or the port. Re-running it on every
+    /// settings change would retry a failed bind — and log the failure again — on each tick of a slider.
+    /// </summary>
     private void ApplyListenerSettings()
     {
         if (_hooks is null) return;
-        if (!Settings.Notifications.Enabled)
-        {
-            _hooks.Stop();
-        }
-        else if (_hooks.Port != Settings.Notifications.Port || !_hooks.IsListening)
-        {
-            _hooks.Start(Settings.Notifications.Port);
-        }
+        var enabled = Settings.Notifications.Enabled;
+        var port = Settings.Notifications.Port;
+        if (enabled == _listenerEnabled && port == _listenerPort) return;
+
+        var portChanged = port != _listenerPort;
+        _listenerEnabled = enabled;
+        _listenerPort = port;
+        if (enabled) _hooks.Start(port); else _hooks.Stop();
+        if (portChanged) _hooksInstalled = ReadHooksInstalled();
         NotificationsChanged?.Invoke();
     }
 
     private void StopNotifications()
     {
+        _testSessionTimer?.Stop();
+        _testSessionTimer = null;
         _hooks?.Dispose();
         _hooks = null;
         _chime?.Dispose();
@@ -82,12 +107,20 @@ public partial class App
 
     private void HandleHookBody(string body)
     {
-        var e = HookEventParser.Parse(body);
-        if (e is null) return;
-        var cue = _sessions.Apply(e, DateTimeOffset.UtcNow);
-        Log.Info($"Session {e.SessionId[..Math.Min(8, e.SessionId.Length)]} ({_sessions.Sessions.FirstOrDefault(s => s.Id == e.SessionId)?.Name}): {e.Kind}{(cue is null ? "" : " → " + cue)}");
-        if (cue is { } c) React(c);
-        RefreshSessionUi();
+        try
+        {
+            var e = HookEventParser.Parse(body);
+            if (e is null) return;
+            var cue = _sessions.Apply(e, DateTimeOffset.UtcNow);
+            Log.Info($"Session {e.SessionId[..Math.Min(8, e.SessionId.Length)]} ({_sessions.Sessions.FirstOrDefault(s => s.Id == e.SessionId)?.Name}): {e.Kind}{(cue is null ? "" : " → " + cue)}");
+            if (cue is { } c) React(c);
+            RefreshSessionUi();
+        }
+        catch (Exception ex)
+        {
+            // The dispatcher swallows exceptions raised from InvokeAsync callbacks, so log them here.
+            Log.Error("Hook event failed", ex);
+        }
     }
 
     private void React(SessionCue cue)
@@ -143,6 +176,7 @@ public partial class App
             File.WriteAllText(path + ".tmp", updated);
             File.Move(path + ".tmp", path, overwrite: true);
             Log.Info($"Claude Code hooks updated in {path}");
+            _hooksInstalled = ReadHooksInstalled();
             NotificationsChanged?.Invoke();
             return null;
         }
@@ -156,6 +190,21 @@ public partial class App
         }
     }
 
-    public void TestNotification() => HandleHookBody(
-        """{"hook_event_name":"Notification","session_id":"test-session","cwd":"C:\\demo\\my-repo","notification_type":"permission_prompt","message":"Claude needs your permission (test)"}""");
+    /// <summary>Fires a demo attention event and clears it again shortly after, so the sample session does not linger.</summary>
+    public void TestNotification()
+    {
+        HandleHookBody(
+            $$"""{"hook_event_name":"Notification","session_id":"{{TestSessionId}}","cwd":"C:\\demo\\my-repo","notification_type":"permission_prompt","message":"Claude needs your permission (test)"}""");
+        _testSessionTimer ??= new DispatcherTimer(DispatcherPriority.Background) { Interval = TestSessionLifetime };
+        _testSessionTimer.Stop();
+        _testSessionTimer.Tick -= EndTestSession;
+        _testSessionTimer.Tick += EndTestSession;
+        _testSessionTimer.Start();
+    }
+
+    private void EndTestSession(object? sender, EventArgs e)
+    {
+        _testSessionTimer?.Stop();
+        HandleHookBody($$"""{"hook_event_name":"SessionEnd","session_id":"{{TestSessionId}}","reason":"other"}""");
+    }
 }

@@ -139,12 +139,14 @@ public partial class App
         Tray?.SetTooltip(BuildTooltip(_model));
     }
 
+    // Windows truncates tray tooltips at 63 characters, so the sessions go first: they are the part
+    // the user is waiting on, and the usage numbers are already on the widget itself.
     private string BuildTooltip(WidgetModel model)
     {
-        var head = model.Rows.Count == 0
-            ? "Claude Toolbar · " + (model.Notice ?? string.Empty)
-            : "Claude Toolbar · " + string.Join(" · ", model.Rows.Select(r => $"{r.Label} {r.PercentText}"));
-        return SessionSummary is { } summary ? head + " · " + summary : head;
+        var usage = model.Rows.Count == 0
+            ? model.Notice ?? string.Empty
+            : string.Join(" · ", model.Rows.Select(r => $"{r.Label} {r.PercentText}"));
+        return SessionSummary is { } summary ? summary + " · " + usage : "Claude Toolbar · " + usage;
     }
 
     private void ShowFlyout()
