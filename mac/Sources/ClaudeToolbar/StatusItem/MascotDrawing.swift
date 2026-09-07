@@ -24,9 +24,12 @@ enum MascotDrawing {
 
         if model.badgeLit, let hex = model.badge.hex, let color = NSColor(argbHex: hex) {
             let radius = CGFloat(ClawdSprite.badgeRadiusCells) * cell
+            // The badge sits half a row above the sprite; the menu bar image is exactly the
+            // sprite's height, so keep the circle inside it instead of slicing off its top.
             let center = NSPoint(
                 x: origin.x + CGFloat(ClawdSprite.badgeCenterCol) * cell,
-                y: origin.y + (CGFloat(ClawdSprite.rows) - CGFloat(ClawdSprite.badgeCenterRow)) * rowHeight)
+                y: min(origin.y + (CGFloat(ClawdSprite.rows) - CGFloat(ClawdSprite.badgeCenterRow)) * rowHeight,
+                       origin.y + height - radius))
             color.setFill()
             NSBezierPath(ovalIn: NSRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)).fill()
         }
