@@ -51,6 +51,7 @@ public static partial class SettingsValidator
         var b = s.Behavior;
         b.RefreshIntervalSeconds = Math.Clamp(b.RefreshIntervalSeconds, 30, 300);
         b.TrayGapPx = Math.Clamp(b.TrayGapPx, 0, 24);
+        b.Mascot = MascotMode.Normalize(b.Mascot);
 
         s.Version = 1;
         return s;

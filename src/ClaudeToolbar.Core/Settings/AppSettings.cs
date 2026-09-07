@@ -37,6 +37,7 @@ public sealed class BehaviorSettings
     public int TrayGapPx { get; set; } = 8;
     public bool HideInFullscreen { get; set; } = true;
     public bool RunAtStartup { get; set; } = true;
+    public string Mascot { get; set; } = MascotMode.Full;
 }
 
 public sealed class AppSettings
