@@ -30,3 +30,10 @@ Use the `ClaudeToolbar-mac` artifact from the newest `mac` workflow run — the 
 | 24 | Reset to defaults | Click it: preview, menu bar item and interval return to defaults at once; relaunch: still default | |
 | 25 | Item while highlighted | With the popover open, and again with the right-click menu open, the menu bar item's text stays readable against the highlight, in light and dark mode | |
 | 26 | Settings file | `cat ~/Library/Application\ Support/ClaudeToolbar/settings.json` after changing a few settings: valid JSON, values match the UI, no token inside | |
+| 27 | Hover wave | Hover the menu bar item: Clawd, the orange pixel character left of the rows, raises his right arm and waves for about a second, then rests; Settings → Behaviour → Mascot = "Waves on hover only" still waves on hover but not at thresholds | |
+| 28 | Greeting and threshold wave | Launch the app: one wave shortly after the first successful fetch; when a row first crosses the warning (default 70 %) or critical (default 90 %) threshold in its current period he waves once (verify with Settings → Appearance thresholds set below the current usage, then restore them) | |
+| 29 | Mascot off and reduce motion | Mascot = "Off" hides Clawd and the rows shift left; with System Settings → Accessibility → Display → Reduce motion on he never animates | |
+| 30 | Hooks install | Settings → Notifications → Install hooks: status says installed; `~/.claude/settings.json` gains six `http` hooks pointing at `http://127.0.0.1:47831/hook`; `settings.json.claudetoolbar-bak` exists next to it | |
+| 31 | Needs-you cue | In a terminal run `claude` in a project and ask it to run a command that needs permission: within a second Clawd's badge blinks amber, he waves, a two-note chime plays, and clicking the item shows "1 session · needs you (project)" | |
+| 32 | Finished cue | Answer the prompt and let Claude finish: badge turns green with a single soft chime; click the item: badge disappears | |
+| 33 | Sound off and remove | Settings → untick "Play a chime": repeat 31 with no sound; Remove hooks: status says not installed and the six hooks are gone from settings.json | |
