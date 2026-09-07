@@ -81,7 +81,7 @@ enum SnapshotRunner {
 
     static func writeSettings(to directory: URL) throws {
         let defaults = SettingsValidator.normalize(AppSettings.createDefault())
-        let size = NSSize(width: 440, height: 620)
+        let size = NSSize(width: 440, height: 1500)
         for (name, appearance, status) in [
             ("settings-light.png", NSAppearance.Name.aqua, UsageStatus.ok),
             ("settings-dark.png", NSAppearance.Name.darkAqua, UsageStatus.ok),
