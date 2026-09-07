@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 
 enum ViewSnapshot {
     enum SnapshotError: Error, CustomStringConvertible {
@@ -55,5 +56,28 @@ enum ViewSnapshot {
         } catch {
             throw SnapshotError.write(url.path)
         }
+    }
+
+    /// Hosts a SwiftUI view in an offscreen window, lets it lay out, and captures it as PNG (1x).
+    @MainActor
+    static func pngData<Content: View>(view: Content, appearance: NSAppearance.Name, size: NSSize? = nil) throws -> Data {
+        let host = NSHostingView(rootView: view)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 400),
+                              styleMask: [.borderless], backing: .buffered, defer: false)
+        window.appearance = NSAppearance(named: appearance)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        let target = size ?? host.fittingSize
+        window.setContentSize(target)
+        host.frame = NSRect(origin: .zero, size: target)
+        window.orderFrontRegardless()
+        host.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+
+        guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { throw SnapshotError.bitmap }
+        host.cacheDisplay(in: host.bounds, to: rep)
+        window.orderOut(nil)
+        guard let data = rep.representation(using: .png, properties: [:]) else { throw SnapshotError.png }
+        return data
     }
 }

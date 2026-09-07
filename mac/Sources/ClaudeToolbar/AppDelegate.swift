@@ -7,9 +7,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settings = AppSettings.createDefault()
     private var controller: StatusItemController!
     private var menu: AppMenu!
+    private var popover: PopoverController!
     private var wakeObserver: WakeObserver?
     private var networkObserver: NetworkObserver?
     private var openSettingsObserver: NSObjectProtocol?
+
+    private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .none
+        f.timeStyle = .short
+        return f
+    }()
+
+    private static let dayTimeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.setLocalizedDateFormatFromTemplate("EEE j:mm")
+        return f
+    }()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         if SingleInstance.anotherInstanceIsRunning() {
@@ -38,11 +52,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu = AppMenu()
         menu.onRefresh = { [weak self] in self?.controller.requestRefresh() }
         menu.onSettings = { [weak self] in self?.openSettings() }
-        menu.onToggleLaunchAtLogin = { [weak self] in self?.toggleLaunchAtLogin() }
+        menu.onToggleLaunchAtLogin = { [weak self] in self?.setLaunchAtLogin(!(self?.settings.behavior.launchAtLogin ?? false)) }
         menu.isLaunchAtLoginEnabled = { [weak self] in self?.settings.behavior.launchAtLogin ?? false }
 
-        controller.onLeftClick = { [weak self] in self?.showMenu() }
+        popover = PopoverController(
+            model: popoverModel(),
+            colors: BarColors(settings: settings),
+            launchAtLogin: settings.behavior.launchAtLogin,
+            onRefresh: { [weak self] in self?.controller.requestRefresh() },
+            onSettings: { [weak self] in
+                self?.popover.close()
+                self?.openSettings()
+            },
+            onQuit: { NSApp.terminate(nil) },
+            onLaunchAtLoginChanged: { [weak self] enabled in self?.setLaunchAtLogin(enabled) })
+
+        controller.onLeftClick = { [weak self] in self?.togglePopover() }
         controller.onRightClick = { [weak self] in self?.showMenu() }
+        controller.onRender = { [weak self] in self?.updatePopover() }
 
         wakeObserver = WakeObserver { [weak self] in
             Log.info("Woke from sleep")
@@ -66,7 +93,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showMenu() {
+        popover.close()
         menu.show(from: controller.item)
+    }
+
+    private func togglePopover() {
+        guard let button = controller.button else { return }
+        updatePopover()
+        popover.toggle(relativeTo: button)
+    }
+
+    private func updatePopover() {
+        popover.update(model: popoverModel(), colors: BarColors(settings: settings), launchAtLogin: settings.behavior.launchAtLogin)
+    }
+
+    private func popoverModel() -> PopoverModel {
+        PopoverModelBuilder.build(state: controller.state, settings: settings, now: Date(), formatClock: Self.formatClock)
+    }
+
+    static func formatClock(_ date: Date) -> String {
+        Calendar.current.isDateInToday(date) ? timeFormatter.string(from: date) : dayTimeFormatter.string(from: date)
     }
 
     /// The settings window arrives in Task 14; until then a request is only logged.
@@ -74,9 +120,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Log.info("Settings requested")
     }
 
-    private func toggleLaunchAtLogin() {
-        settings.behavior.launchAtLogin.toggle()
-        LaunchAtLogin.apply(settings.behavior.launchAtLogin)
+    private func setLaunchAtLogin(_ enabled: Bool) {
+        guard settings.behavior.launchAtLogin != enabled else { return }
+        settings.behavior.launchAtLogin = enabled
+        LaunchAtLogin.apply(enabled)
         saveSettings()
     }
 
@@ -87,5 +134,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Log.error("Could not save settings: \(error.localizedDescription)")
         }
         controller.updateSettings(settings)
+        updatePopover()
     }
 }

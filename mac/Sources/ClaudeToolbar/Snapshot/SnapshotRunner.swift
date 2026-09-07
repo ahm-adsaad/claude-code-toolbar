@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import ClaudeToolbarCore
 
 /// Renders every view with sample data into PNG files so the UI can be reviewed without a Mac.
@@ -9,6 +10,7 @@ enum SnapshotRunner {
         let directory = URL(fileURLWithPath: outputDirectory, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try writeStatusItems(to: directory)
+        try writePopovers(to: directory)
         print("snapshots written to \(directory.path)")
     }
 
@@ -49,5 +51,30 @@ enum SnapshotRunner {
         textOnly.rows.showBar = false
         textOnly.rows.showTime = true
         try write("statusitem-textonly-dark.png", model(.ok, settings: textOnly), settings: textOnly, dark: true)
+    }
+
+    static func writePopovers(to directory: URL) throws {
+        let defaults = SettingsValidator.normalize(AppSettings.createDefault())
+        let clock: (Date) -> String = { date in
+            let f = DateFormatter()
+            f.locale = Locale(identifier: "en_US")
+            f.timeZone = TimeZone(secondsFromGMT: 0)
+            f.setLocalizedDateFormatFromTemplate("EEE j:mm")
+            return f.string(from: date)
+        }
+
+        func view(_ status: UsageStatus, snapshot: UsageSnapshot? = SampleData.snapshot) -> some View {
+            let model = PopoverModelBuilder.build(state: SampleData.state(status, snapshot: snapshot), settings: defaults, now: SampleData.now, formatClock: clock)
+            return PopoverView(model: model, colors: BarColors(settings: defaults), launchAtLogin: .constant(true),
+                               onRefresh: {}, onSettings: {}, onQuit: {})
+                .background(Color(nsColor: .windowBackgroundColor))
+        }
+
+        try ViewSnapshot.write(try ViewSnapshot.pngData(view: view(.ok), appearance: .aqua), to: directory, name: "popover-light.png")
+        try ViewSnapshot.write(try ViewSnapshot.pngData(view: view(.ok), appearance: .darkAqua), to: directory, name: "popover-dark.png")
+        try ViewSnapshot.write(try ViewSnapshot.pngData(view: view(.ok, snapshot: SampleData.fullSnapshot), appearance: .darkAqua), to: directory, name: "popover-all-dark.png")
+        try ViewSnapshot.write(try ViewSnapshot.pngData(view: view(.stale), appearance: .darkAqua), to: directory, name: "popover-stale-dark.png")
+        try ViewSnapshot.write(try ViewSnapshot.pngData(view: view(.expired), appearance: .darkAqua), to: directory, name: "popover-expired-dark.png")
+        try ViewSnapshot.write(try ViewSnapshot.pngData(view: view(.noCredentials, snapshot: nil), appearance: .darkAqua), to: directory, name: "popover-nocreds-dark.png")
     }
 }
