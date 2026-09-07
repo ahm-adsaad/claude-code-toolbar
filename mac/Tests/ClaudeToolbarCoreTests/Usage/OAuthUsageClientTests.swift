@@ -56,6 +56,16 @@ final class OAuthUsageClientTests: XCTestCase {
         XCTAssertEqual(none, .rateLimited(retryAfter: nil))
     }
 
+    func testRateLimitedWithPastDateClampsToZero() async {
+        let date = clock.now.addingTimeInterval(-90)
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss 'GMT'"
+        let result = await client(FakeTransport(FakeTransport.response(429, headers: ["retry-after": formatter.string(from: date)]))).fetch(accessToken: "t")
+        XCTAssertEqual(result, .rateLimited(retryAfter: 0))
+    }
+
     func testOtherStatusFails() async {
         let result = await client(FakeTransport(FakeTransport.response(500, body: "boom"))).fetch(accessToken: "t")
         XCTAssertEqual(result, .failed("HTTP 500"))

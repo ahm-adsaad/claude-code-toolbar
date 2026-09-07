@@ -51,7 +51,7 @@ public struct OAuthUsageClient: UsageClient {
     static func retryAfter(_ header: String?, now: Date) -> TimeInterval? {
         guard let header = header?.trimmingCharacters(in: .whitespaces), !header.isEmpty else { return nil }
         if let seconds = Double(header) { return max(seconds, 0) }
-        if let date = HTTPDate.parse(header) { return date.timeIntervalSince(now) }
+        if let date = HTTPDate.parse(header) { return max(date.timeIntervalSince(now), 0) }
         return nil
     }
 
