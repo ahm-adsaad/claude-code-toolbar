@@ -60,8 +60,10 @@ public partial class App
         }));
 
         _widget = new WidgetWindow();
+        _widget.Clicked += AcknowledgeSessions;
         _widget.Clicked += OpenSettings;
         _widget.MenuRequested += () => _menu?.Show();
+        _widget.FlyoutRequested += AcknowledgeSessions;
         _widget.FlyoutRequested += ShowFlyout;
         _controller = new WidgetController(_widget, new TaskbarTracker(_widget), () => Settings);
         _theme = WidgetTheme.FromSettings(Settings.Appearance);
@@ -78,6 +80,7 @@ public partial class App
         _widget.HoverStarted += () => StartWave(MascotCue.Hover);
         _waveTimer = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(1000.0 / WaveAnimation.FramesPerSecond) };
         _waveTimer.Tick += (_, _) => WaveFrame();
+        StartNotifications();
         Log.Info($"Monitoring credentials at {credentialsPath}");
     }
 
@@ -102,6 +105,7 @@ public partial class App
             TrySafe(() => StartupRegistration.Apply(Settings.Behavior.RunAtStartup), "startup registration");
             _menu?.SetRunAtStartup(Settings.Behavior.RunAtStartup);
         }
+        ApplyListenerSettings();
         if (_monitor is not null) RenderWidget(_monitor.State);
         _controller?.Reposition();
         if (MascotMode.Normalize(Settings.Behavior.Mascot) == MascotMode.Off)
@@ -135,16 +139,19 @@ public partial class App
         Tray?.SetTooltip(BuildTooltip(_model));
     }
 
-    private static string BuildTooltip(WidgetModel model)
+    private string BuildTooltip(WidgetModel model)
     {
-        if (model.Rows.Count == 0) return "Claude Toolbar · " + (model.Notice ?? string.Empty);
-        return "Claude Toolbar · " + string.Join(" · ", model.Rows.Select(r => $"{r.Label} {r.PercentText}"));
+        var head = model.Rows.Count == 0
+            ? "Claude Toolbar · " + (model.Notice ?? string.Empty)
+            : "Claude Toolbar · " + string.Join(" · ", model.Rows.Select(r => $"{r.Label} {r.PercentText}"));
+        return SessionSummary is { } summary ? head + " · " + summary : head;
     }
 
     private void ShowFlyout()
     {
         if (_widget is null || _monitor is null || _theme is null) return;
         var flyout = FlyoutModelBuilder.Build(_monitor.State, DateTimeOffset.UtcNow, t => t.ToLocalTime().ToString("HH:mm"));
+        if (SessionSummary is { } summary) flyout = flyout with { Lines = [.. flyout.Lines, summary] };
         _widget.ShowFlyout(flyout, _theme);
     }
 
@@ -162,6 +169,7 @@ public partial class App
 
         _model = WidgetModelBuilder.Build(_monitor.State, Settings, DateTimeOffset.UtcNow);
         _widget.UpdateTimes(_model);
+        TickSessions();
         UpdateMascot();
         if (_widget.IsFlyoutOpen) ShowFlyout();
     }
@@ -242,6 +250,7 @@ public partial class App
     {
         _tick?.Stop();
         _waveTimer?.Stop();
+        StopNotifications();
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         NetworkChange.NetworkAvailabilityChanged -= OnNetworkAvailabilityChanged;

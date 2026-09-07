@@ -123,6 +123,20 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
 
     public string Mascot { get => _s.Behavior.Mascot; set { _s.Behavior.Mascot = MascotMode.Normalize(value); Changed(); } }
 
+    // Notifications
+    public bool NotificationsEnabled { get => _s.Notifications.Enabled; set { _s.Notifications.Enabled = value; Changed(); } }
+    public bool NotificationsSound { get => _s.Notifications.Sound; set { _s.Notifications.Sound = value; Changed(); } }
+
+    public string NotificationsPort
+    {
+        get => _s.Notifications.Port.ToString();
+        set
+        {
+            if (int.TryParse(value, out var port)) { _s.Notifications.Port = port; Changed(); }
+            else Raise();
+        }
+    }
+
     // Account (read-only, fed by UpdateAccount)
     public string CredentialsPath { get; private set; } = string.Empty;
     public string TokenStateText { get; private set; } = "Unknown";
@@ -174,6 +188,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         _s.Appearance = fresh.Appearance;
         _s.Rows = fresh.Rows;
         _s.Behavior = fresh.Behavior;
+        _s.Notifications = fresh.Notifications;
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty));
         _onChanged();
     }

@@ -28,6 +28,8 @@ public partial class SettingsWindow : Window
         PreviewHost.Content = _preview;
         _vm.PropertyChanged += OnVmChanged;
         RenderPreview();
+        App.Current.NotificationsChanged += RefreshNotificationStatus;
+        RefreshNotificationStatus();
     }
 
     public SettingsViewModel ViewModel => _vm;
@@ -61,6 +63,30 @@ public partial class SettingsWindow : Window
         _preview.SetMascot(MascotModelBuilder.Build(model, _vm.Settings.Behavior.Mascot, WaveAnimation.RestAngle, MascotBadge.Working));
     }
 
+    private void RefreshNotificationStatus()
+    {
+        var app = App.Current;
+        ListenerStatusText.Text = app.ListenerStatus;
+        var installed = app.HooksInstalled;
+        HooksStatusText.Text = installed
+            ? $"Claude Code hooks: installed in {app.ClaudeSettingsPath}"
+            : $"Claude Code hooks: not installed ({app.ClaudeSettingsPath})";
+        InstallHooksButton.IsEnabled = !installed;
+        RemoveHooksButton.IsEnabled = installed;
+    }
+
+    private void OnInstallHooks(object sender, RoutedEventArgs e) => ShowHooksResult(App.Current.InstallHooks());
+
+    private void OnRemoveHooks(object sender, RoutedEventArgs e) => ShowHooksResult(App.Current.RemoveHooks());
+
+    private void OnTestNotification(object sender, RoutedEventArgs e) => App.Current.TestNotification();
+
+    private void ShowHooksResult(string? error)
+    {
+        RefreshNotificationStatus();
+        if (error is not null) HooksStatusText.Text = "Could not update hooks: " + error;
+    }
+
     private void Reset_Click(object sender, RoutedEventArgs e) => _vm.ReloadFrom(AppSettings.CreateDefault());
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
@@ -70,6 +96,7 @@ public partial class SettingsWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _vm.PropertyChanged -= OnVmChanged;
+        App.Current.NotificationsChanged -= RefreshNotificationStatus;
         base.OnClosed(e);
     }
 }
