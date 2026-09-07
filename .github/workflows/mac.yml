@@ -38,6 +38,12 @@ jobs:
       - run: swift test
       - run: bash scripts/build-app.sh
       - run: build/ClaudeToolbar.app/Contents/MacOS/ClaudeToolbar --version
+      - run: build/ClaudeToolbar.app/Contents/MacOS/ClaudeToolbar --snapshot build/snapshots
+      - run: ls -la build/snapshots
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-snapshots
+          path: mac/build/snapshots
       - uses: actions/upload-artifact@v4
         with:
           name: ClaudeToolbar-mac
