@@ -34,6 +34,8 @@ public partial class App
     private DispatcherTimer? _waveTimer;
     private DateTimeOffset? _waveStartedAt;
     private bool _greeted;
+    private MascotBadge _badge = MascotBadge.None;
+    private bool _badgeLit = true;
 
     public event Action<MonitorState>? MonitorStateChanged;
 
@@ -191,9 +193,7 @@ public partial class App
     private void UpdateMascot()
     {
         if (_widget is null || _model is null) return;
-        _widget.UpdateMascot(
-            MascotModelBuilder.Build(_model, Settings.Behavior.Mascot, CurrentArmAngle()),
-            _theme ??= WidgetTheme.FromSettings(Settings.Appearance));
+        _widget.UpdateMascot(MascotModelBuilder.Build(_model, Settings.Behavior.Mascot, CurrentArmAngle(), _badge, _badgeLit));
     }
 
     private void ObserveCues(MonitorState state)

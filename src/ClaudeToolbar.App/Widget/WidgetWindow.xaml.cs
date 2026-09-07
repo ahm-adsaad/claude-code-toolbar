@@ -53,7 +53,7 @@ public partial class WidgetWindow : Window
 
     public void UpdateTimes(WidgetModel model) => _rows.UpdateTimes(model);
 
-    public void UpdateMascot(MascotModel model, WidgetTheme theme) => _rows.SetMascot(model, theme);
+    public void UpdateMascot(MascotModel model) => _rows.SetMascot(model);
 
     public (int Width, int Height) PhysicalSize()
     {

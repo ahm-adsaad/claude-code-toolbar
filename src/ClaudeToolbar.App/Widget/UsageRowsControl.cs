@@ -67,7 +67,7 @@ public sealed class UsageRowsControl : Border
         }
     }
 
-    public void SetMascot(MascotModel model, WidgetTheme theme) => _mascot.Update(model, theme);
+    public void SetMascot(MascotModel model) => _mascot.Update(model);
 
     public void UpdateTimes(WidgetModel model)
     {
