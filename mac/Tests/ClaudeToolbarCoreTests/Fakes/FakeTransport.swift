@@ -28,11 +28,16 @@ final class FakeTransport: HTTPTransport, @unchecked Sendable {
     }
 
     func send(_ request: URLRequest) async throws -> HTTPResponse {
+        let next = record(request)
+        return try next.get()
+    }
+
+    /// The lock lives here because `NSLock.lock()` is unavailable from an async context.
+    private func record(_ request: URLRequest) -> Result<HTTPResponse, Error> {
         lock.lock(); defer { lock.unlock() }
         requests.append(request)
-        guard !responses.isEmpty else { throw FakeTransportError() }
-        let next = responses.count == 1 ? responses[0] : responses.removeFirst()
-        return try next.get()
+        guard !responses.isEmpty else { return .failure(FakeTransportError()) }
+        return responses.count == 1 ? responses[0] : responses.removeFirst()
     }
 
     static func response(_ status: Int, body: String = "", headers: [String: String] = [:]) -> HTTPResponse {

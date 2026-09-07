@@ -8,7 +8,7 @@ final class SettingsWindowController: NSWindowController {
     init(model: SettingsModel) {
         self.model = model
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 440, height: 620),
-                              styleMask: [.titled, .closable, .miniaturizable],
+                              styleMask: [.titled, .closable],
                               backing: .buffered, defer: false)
         window.title = "Claude Toolbar Settings"
         window.isReleasedWhenClosed = false

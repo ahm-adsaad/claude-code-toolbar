@@ -93,7 +93,8 @@ final class StatusItemController {
         guard let button = statusItem.button else { return }
         let model = StatusItemModelBuilder.build(state: state, settings: settings, now: clock.now)
         button.image = StatusItemRenderer.render(model: model, settings: settings, appearance: button.effectiveAppearance)
-        button.toolTip = tooltip(for: model)
+        let text = tooltip(for: model)
+        if button.toolTip != text { button.toolTip = text }
         onRender?()
     }
 
@@ -106,7 +107,8 @@ final class StatusItemController {
         }
         if let hint = model.hint { lines.append(hint) }
         if let last = state.lastSuccess {
-            lines.append("Updated \(AgoFormatter.format(ago: clock.now.timeIntervalSince(last))) ago")
+            let elapsed = clock.now.timeIntervalSince(last)
+            lines.append(elapsed < 60 ? "Updated just now" : "Updated \(AgoFormatter.format(ago: elapsed)) ago")
         }
         return lines.joined(separator: "\n")
     }

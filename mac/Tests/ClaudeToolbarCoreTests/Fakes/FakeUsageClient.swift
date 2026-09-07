@@ -28,15 +28,17 @@ final class FakeUsageClient: UsageClient, @unchecked Sendable {
     }
 
     func fetch(accessToken: String) async -> UsageResult {
-        lock.lock()
-        tokens.append(accessToken)
-        let result: UsageResult = queue.isEmpty ? .failed("no fake result queued") : (queue.count == 1 ? queue[0] : queue.removeFirst())
-        let gate = self.gate
-        lock.unlock()
-        if let gate {
-            await gate.wait()
-        }
+        let (result, gate) = dequeue(token: accessToken)
+        if let gate { await gate.wait() }
         return result
+    }
+
+    /// The lock lives here because `NSLock.lock()` is unavailable from an async context.
+    private func dequeue(token: String) -> (UsageResult, CheckedContinuationBox?) {
+        lock.lock(); defer { lock.unlock() }
+        tokens.append(token)
+        let result: UsageResult = queue.isEmpty ? .failed("no fake result queued") : (queue.count == 1 ? queue[0] : queue.removeFirst())
+        return (result, gate)
     }
 }
 

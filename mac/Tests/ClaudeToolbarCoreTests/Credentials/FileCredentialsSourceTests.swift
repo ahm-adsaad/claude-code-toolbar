@@ -16,7 +16,7 @@ final class FileCredentialsSourceTests: XCTestCase {
 
     private func write(_ text: String) -> String {
         let path = directory.appendingPathComponent(".credentials.json").path
-        FileManager.default.createFile(atPath: path, contents: Data(text.utf8))
+        _ = FileManager.default.createFile(atPath: path, contents: Data(text.utf8))
         return path
     }
 

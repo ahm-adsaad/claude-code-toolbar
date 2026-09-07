@@ -71,7 +71,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         controller.onLeftClick = { [weak self] in self?.togglePopover() }
         controller.onRightClick = { [weak self] in self?.showMenu() }
-        controller.onRender = { [weak self] in self?.updatePopover() }
+        controller.onRender = { [weak self] in
+            guard let self, self.popover.isShown else { return }
+            self.updatePopover()
+        }
         controller.onStateChanged = { [weak self] state in
             self?.settingsModel?.account = state
         }
@@ -90,6 +93,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         LaunchAtLogin.apply(settings.behavior.launchAtLogin)
         Log.info("Launch at login: \(LaunchAtLogin.statusDescription)")
+    }
+
+    /// Finder, Dock and Spotlight re-activate a running app instead of starting a second process.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        openSettings()
+        return true
+    }
+
+    func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
+        true
     }
 
     func applicationWillTerminate(_ notification: Notification) {

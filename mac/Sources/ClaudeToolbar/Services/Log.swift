@@ -30,9 +30,9 @@ final class Log {
         queue.async {
             self.rotateIfNeeded()
             if let handle = FileHandle(forWritingAtPath: self.path) {
-                handle.seekToEndOfFile()
-                handle.write(Data(line.utf8))
-                handle.closeFile()
+                _ = try? handle.seekToEnd()
+                try? handle.write(contentsOf: Data(line.utf8))
+                try? handle.close()
             } else {
                 FileManager.default.createFile(atPath: self.path, contents: Data(line.utf8))
             }

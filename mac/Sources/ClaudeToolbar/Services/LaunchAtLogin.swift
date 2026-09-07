@@ -24,6 +24,10 @@ enum LaunchAtLogin {
     @discardableResult
     static func apply(_ enabled: Bool) -> Bool {
         guard isAvailable else { return false }
+        if enabled, SMAppService.mainApp.status == .requiresApproval {
+            Log.info("Launch at login is waiting for approval in System Settings › General › Login Items")
+            return true
+        }
         do {
             let status = SMAppService.mainApp.status
             if enabled, status != .enabled {
