@@ -18,10 +18,10 @@ swift build -c release --arch x86_64 --product ClaudeToolbar
 ARM_BIN=".build/arm64-apple-macosx/release/ClaudeToolbar"
 X86_BIN=".build/x86_64-apple-macosx/release/ClaudeToolbar"
 if [ ! -f "$ARM_BIN" ]; then
-  ARM_BIN="$(find .build -type f -path '*arm64-apple-macosx/release/ClaudeToolbar' | head -n 1)"
+  ARM_BIN="$(find .build -type f -path '*arm64-apple-macosx/release/ClaudeToolbar' -print -quit)"
 fi
 if [ ! -f "$X86_BIN" ]; then
-  X86_BIN="$(find .build -type f -path '*x86_64-apple-macosx/release/ClaudeToolbar' | head -n 1)"
+  X86_BIN="$(find .build -type f -path '*x86_64-apple-macosx/release/ClaudeToolbar' -print -quit)"
 fi
 if [ ! -f "$ARM_BIN" ] || [ ! -f "$X86_BIN" ]; then
   echo "built binary not found" >&2
@@ -43,6 +43,11 @@ codesign --force --deep --sign - "$APP"
 codesign --verify --deep --strict "$APP"
 plutil -lint "$APP/Contents/Info.plist"
 lipo -info "$APP/Contents/MacOS/ClaudeToolbar"
+ARCHS="$(lipo -archs "$APP/Contents/MacOS/ClaudeToolbar")"
+case "$ARCHS" in
+  *arm64*x86_64*|*x86_64*arm64*) ;;
+  *) echo "expected a universal binary, got: $ARCHS" >&2; exit 1 ;;
+esac
 
 rm -f "$ZIP"
 ditto -c -k --keepParent "$APP" "$ZIP"
