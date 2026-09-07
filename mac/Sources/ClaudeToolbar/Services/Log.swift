@@ -23,6 +23,7 @@ final class Log {
 
     static func info(_ message: String) { shared.write("INFO", message) }
     static func error(_ message: String) { shared.write("ERROR", message) }
+    static func flush() { shared.queue.sync {} }
 
     private func write(_ level: String, _ message: String) {
         let line = "\(Self.timestampFormatter.string(from: Date())) [\(level)] \(message)\n"

@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         if SingleInstance.anotherInstanceIsRunning() {
             Log.info("Another instance is running; asked it to open Settings and exiting")
+            Log.flush()
             NSApp.terminate(nil)
             return
         }
@@ -30,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         Log.info("ClaudeToolbar exiting")
+        Log.flush()
     }
 
     @objc private func quit(_ sender: Any?) {
