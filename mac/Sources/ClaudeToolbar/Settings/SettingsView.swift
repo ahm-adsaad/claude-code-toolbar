@@ -19,6 +19,7 @@ struct PreviewStrip: View {
 
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
+    var contentHeight: CGFloat = 620
 
     private var presetBinding: Binding<String> {
         Binding(get: { model.settings.appearance.preset }, set: { model.applyPreset($0) })
@@ -92,6 +93,6 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 440, height: 620)
+        .frame(width: 440, height: contentHeight)
     }
 }

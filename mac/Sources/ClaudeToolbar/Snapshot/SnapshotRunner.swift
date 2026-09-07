@@ -81,7 +81,7 @@ enum SnapshotRunner {
 
     static func writeSettings(to directory: URL) throws {
         let defaults = SettingsValidator.normalize(AppSettings.createDefault())
-        let size = NSSize(width: 440, height: 620)
+        let size = NSSize(width: 440, height: 1200)
         for (name, appearance, status) in [
             ("settings-light.png", NSAppearance.Name.aqua, UsageStatus.ok),
             ("settings-dark.png", NSAppearance.Name.darkAqua, UsageStatus.ok),
@@ -89,7 +89,7 @@ enum SnapshotRunner {
         ] {
             let model = SettingsModel(settings: defaults, account: SampleData.state(status), launchAtLoginStatus: "enabled",
                                       onApply: { _ in }, onSave: { _ in }, onRefresh: {})
-            let data = try ViewSnapshot.pngData(view: SettingsView(model: model), appearance: appearance, size: size)
+            let data = try ViewSnapshot.pngData(view: SettingsView(model: model, contentHeight: size.height), appearance: appearance, size: size)
             try ViewSnapshot.write(data, to: directory, name: name)
         }
     }
