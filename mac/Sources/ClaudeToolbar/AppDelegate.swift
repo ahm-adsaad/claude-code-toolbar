@@ -226,8 +226,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let listener = hookListener else { return }
         let enabled = settings.notifications.enabled
         let port = settings.notifications.port
+        let portChanged = port != listenerPort
         defer { settingsModel?.listenerStatus = listenerStatus }
-        guard enabled != listenerEnabled || port != listenerPort else { return }
+        guard enabled != listenerEnabled || portChanged else { return }
         listenerEnabled = enabled
         listenerPort = port
         if enabled {
@@ -235,6 +236,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             listener.stop()
         }
+        // The hook URL carries the port, so hooks installed for the old one no longer point here.
+        if portChanged { settingsModel?.hooksInstalled = HooksInstaller.isInstalled(url: hookUrl) }
     }
 
     private func handleHook(_ body: String) {
