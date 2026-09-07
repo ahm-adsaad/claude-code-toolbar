@@ -60,17 +60,19 @@ public struct RowSettings: Codable, Equatable, Sendable {
 public struct BehaviorSettings: Codable, Equatable, Sendable {
     public var refreshIntervalSeconds = 60
     public var launchAtLogin = true
+    public var mascot = MascotMode.full
 
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case refreshIntervalSeconds, launchAtLogin
+        case refreshIntervalSeconds, launchAtLogin, mascot
     }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         refreshIntervalSeconds = try c.decodeIfPresent(Int.self, forKey: .refreshIntervalSeconds) ?? refreshIntervalSeconds
         launchAtLogin = try c.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? launchAtLogin
+        mascot = try c.decodeIfPresent(String.self, forKey: .mascot) ?? mascot
     }
 }
 

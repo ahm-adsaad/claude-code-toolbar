@@ -34,6 +34,7 @@ public enum SettingsValidator {
         s.rows.barWidth = min(max(s.rows.barWidth, 24), 80)
 
         s.behavior.refreshIntervalSeconds = min(max(s.behavior.refreshIntervalSeconds, 30), 300)
+        s.behavior.mascot = MascotMode.normalize(s.behavior.mascot)
 
         s.version = 1
         return s
