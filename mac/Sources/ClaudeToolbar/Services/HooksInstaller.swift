@@ -22,9 +22,15 @@ enum HooksInstaller {
         let fm = FileManager.default
         do {
             let current = fm.fileExists(atPath: path) ? try String(contentsOfFile: path, encoding: .utf8) : ""
+            // Copy aside first: removing the old backup before the copy succeeds would throw
+            // away the only good copy if the copy then failed.
             if fm.fileExists(atPath: path) {
-                try? fm.removeItem(atPath: path + backupSuffix)
-                try fm.copyItem(atPath: path, toPath: path + backupSuffix)
+                let backup = path + backupSuffix
+                let staged = backup + ".tmp"
+                try? fm.removeItem(atPath: staged)
+                try fm.copyItem(atPath: path, toPath: staged)
+                try? fm.removeItem(atPath: backup)
+                try fm.moveItem(atPath: staged, toPath: backup)
             }
             let updated = try change(current)
             try fm.createDirectory(atPath: (path as NSString).deletingLastPathComponent, withIntermediateDirectories: true)

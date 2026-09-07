@@ -9,6 +9,9 @@ final class HookListener {
 
     private var listener: NWListener?
     private let queue = DispatchQueue(label: "io.github.ahm-adsaad.ClaudeToolbar.hooks")
+    /// Bumped on every start and stop: a callback already in flight when a listener is cancelled
+    /// carries the old value and is ignored instead of writing a stale error over the new listener.
+    private var generation = 0
 
     private(set) var port: UInt16?
     private(set) var error: String?
@@ -31,12 +34,14 @@ final class HookListener {
         // Bound to the loopback address only: nothing outside this Mac can reach the hook endpoint.
         parameters.requiredLocalEndpoint = NWEndpoint.hostPort(host: .ipv4(.loopback), port: endpointPort)
         let queue = self.queue
+        generation += 1
+        let generation = self.generation
         do {
             let listener = try NWListener(using: parameters)
             self.listener = listener
             listener.stateUpdateHandler = { [weak self] state in
                 Task { @MainActor in
-                    guard let self else { return }
+                    guard let self, generation == self.generation else { return }
                     switch state {
                     case .ready:
                         self.error = nil
@@ -58,7 +63,15 @@ final class HookListener {
                     return
                 }
                 _ = HookConnection(connection, queue: queue) { body in
-                    Task { @MainActor in self.onHook?(body) }
+                    // The main queue keeps the events in the order they arrived; independent
+                    // tasks would not, and a Stop overtaking its Notification would leave the
+                    // session in the wrong state.
+                    DispatchQueue.main.async {
+                        MainActor.assumeIsolated {
+                            guard generation == self.generation else { return }
+                            self.onHook?(body)
+                        }
+                    }
                 }
             }
             listener.start(queue: queue)
@@ -71,8 +84,13 @@ final class HookListener {
     }
 
     func stop() {
+        // Drop the handlers before cancelling: a .failed state posted just before the cancel
+        // would otherwise land after the replacement listener is ready and mark it broken.
+        listener?.stateUpdateHandler = nil
+        listener?.newConnectionHandler = nil
         listener?.cancel()
         listener = nil
+        generation += 1
         port = nil
         error = nil
     }
@@ -100,7 +118,9 @@ final class HookConnection: @unchecked Sendable {
         self.connection = connection
         self.deliver = deliver
         connection.start(queue: queue)
-        let timeout = DispatchWorkItem { [self] in self.respond(status: "408 Request Timeout", body: "") }
+        // Weak: a strong capture here would be a cycle through timeoutWork that cancel() does
+        // not break. The pending receive keeps this object alive for as long as the read lasts.
+        let timeout = DispatchWorkItem { [weak self] in self?.respond(status: "400 Bad Request", body: "") }
         timeoutWork = timeout
         queue.asyncAfter(deadline: .now() + 2, execute: timeout)
         receive()
@@ -169,5 +189,6 @@ final class HookConnection: @unchecked Sendable {
         let payload = "HTTP/1.1 \(status)\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n" + body
         let connection = self.connection
         connection.send(content: Data(payload.utf8), completion: .contentProcessed { _ in connection.cancel() })
+        timeoutWork = nil
     }
 }

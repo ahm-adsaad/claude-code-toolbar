@@ -36,17 +36,21 @@ final class StatusItemController {
     /// Session badge on Clawd's shoulder; the notification bridge drives it.
     var badge: MascotBadge = .none {
         didSet {
-            guard badge != oldValue else { return }
+            guard badge != oldValue, !isPreparingRender else { return }
             renderButton()
         }
     }
     /// False while the attention badge is in its blink-off phase.
     var badgeLit = true {
         didSet {
-            guard badgeLit != oldValue else { return }
+            guard badgeLit != oldValue, !isPreparingRender else { return }
             renderButton()
         }
     }
+
+    /// True while `beforeRender` runs: a badge it changes is painted by the render that follows,
+    /// so the setters skip their own repaint instead of painting the same frame twice.
+    private var isPreparingRender = false
 
     var onLeftClick: (() -> Void)?
     var onRightClick: (() -> Void)?
@@ -140,7 +144,9 @@ final class StatusItemController {
     }
 
     func render() {
+        isPreparingRender = true
         beforeRender?()
+        isPreparingRender = false
         renderButton()
         onRender?()
     }
