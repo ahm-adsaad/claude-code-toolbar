@@ -7,16 +7,30 @@ BUILD_DIR="build"
 APP="$BUILD_DIR/ClaudeToolbar.app"
 ZIP="$BUILD_DIR/ClaudeToolbar-mac.zip"
 
-swift build -c release --arch arm64 --arch x86_64 --product ClaudeToolbar
+# Built as two separate single-arch release builds (native SwiftPM build
+# system) and merged with lipo, rather than `swift build --arch arm64 --arch
+# x86_64` in one invocation: the combined-arch form routes through the
+# XCBuild backend, which fails to translate the package's swiftLanguageMode
+# setting (`SWIFT_VERSION '' is unsupported`).
+swift build -c release --arch arm64 --product ClaudeToolbar
+swift build -c release --arch x86_64 --product ClaudeToolbar
 
-BIN=".build/apple/Products/Release/ClaudeToolbar"
-if [ ! -f "$BIN" ]; then
-  BIN="$(find .build -type f -path '*Products/Release/ClaudeToolbar' | head -n 1)"
+ARM_BIN=".build/arm64-apple-macosx/release/ClaudeToolbar"
+X86_BIN=".build/x86_64-apple-macosx/release/ClaudeToolbar"
+if [ ! -f "$ARM_BIN" ]; then
+  ARM_BIN="$(find .build -type f -path '*arm64-apple-macosx/release/ClaudeToolbar' | head -n 1)"
 fi
-if [ ! -f "$BIN" ]; then
+if [ ! -f "$X86_BIN" ]; then
+  X86_BIN="$(find .build -type f -path '*x86_64-apple-macosx/release/ClaudeToolbar' | head -n 1)"
+fi
+if [ ! -f "$ARM_BIN" ] || [ ! -f "$X86_BIN" ]; then
   echo "built binary not found" >&2
   exit 1
 fi
+
+mkdir -p ".build/apple/Products/Release"
+BIN=".build/apple/Products/Release/ClaudeToolbar"
+lipo -create -output "$BIN" "$ARM_BIN" "$X86_BIN"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
