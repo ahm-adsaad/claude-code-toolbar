@@ -3,7 +3,7 @@ import SwiftUI
 import ClaudeToolbarCore
 
 @MainActor
-final class PopoverController {
+final class PopoverController: NSObject, NSPopoverDelegate {
     @MainActor
     final class Model: ObservableObject {
         @Published var popover: PopoverModel
@@ -19,6 +19,8 @@ final class PopoverController {
 
     private let popover = NSPopover()
     private let model: Model
+    private var lastClosedAt: Date = .distantPast
+    private static let reopenGuard: TimeInterval = 0.3
 
     init(model initial: PopoverModel, colors: BarColors, launchAtLogin: Bool,
          onRefresh: @escaping () -> Void, onSettings: @escaping () -> Void, onQuit: @escaping () -> Void,
@@ -29,6 +31,8 @@ final class PopoverController {
         popover.contentViewController = NSHostingController(rootView: PopoverRoot(
             model: model, onRefresh: onRefresh, onSettings: onSettings, onQuit: onQuit,
             onLaunchAtLoginChanged: onLaunchAtLoginChanged))
+        super.init()
+        popover.delegate = self
     }
 
     var isShown: Bool { popover.isShown }
@@ -37,12 +41,20 @@ final class PopoverController {
         if popover.isShown {
             popover.performClose(nil)
         } else {
+            // A transient popover dismisses on the mouse-down that precedes the status
+            // item's .leftMouseUp action, so a click that closed it would otherwise
+            // immediately reopen it here; ignore a show that lands right after a close.
+            guard Date().timeIntervalSince(lastClosedAt) > Self.reopenGuard else { return }
             popover.show(relativeTo: view.bounds, of: view, preferredEdge: .minY)
         }
     }
 
     func close() {
         if popover.isShown { popover.performClose(nil) }
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        lastClosedAt = Date()
     }
 
     func update(model newModel: PopoverModel, colors: BarColors, launchAtLogin: Bool) {
