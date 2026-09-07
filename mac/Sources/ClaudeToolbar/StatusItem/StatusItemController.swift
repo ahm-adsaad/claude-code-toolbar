@@ -47,6 +47,13 @@ final class StatusItemController {
             renderButton()
         }
     }
+    /// One line about the live Claude Code sessions, shown first in the tooltip; nil when there are none.
+    var sessionSummary: String? {
+        didSet {
+            guard sessionSummary != oldValue, !isPreparingRender else { return }
+            renderButton()
+        }
+    }
 
     /// True while `beforeRender` runs: a badge it changes is painted by the render that follows,
     /// so the setters skip their own repaint instead of painting the same frame twice.
@@ -208,17 +215,23 @@ final class StatusItemController {
         waveTimer = nil
     }
 
+    /// The session summary leads, then either the notice or the usage rows.
     private func tooltip(for model: StatusItemModel) -> String {
-        if let notice = model.notice { return notice }
-        var lines = model.rows.map { row -> String in
-            var text = "\(row.label) \(row.percentText)"
-            if !row.timeText.isEmpty { text += " · resets in \(row.timeText)" }
-            return text
-        }
-        if let hint = model.hint { lines.append(hint) }
-        if let last = state.lastSuccess {
-            let elapsed = clock.now.timeIntervalSince(last)
-            lines.append(elapsed < 60 ? "Updated just now" : "Updated \(AgoFormatter.format(ago: elapsed)) ago")
+        var lines: [String] = []
+        if let sessionSummary { lines.append(sessionSummary) }
+        if let notice = model.notice {
+            lines.append(notice)
+        } else {
+            lines += model.rows.map { row -> String in
+                var text = "\(row.label) \(row.percentText)"
+                if !row.timeText.isEmpty { text += " · resets in \(row.timeText)" }
+                return text
+            }
+            if let hint = model.hint { lines.append(hint) }
+            if let last = state.lastSuccess {
+                let elapsed = clock.now.timeIntervalSince(last)
+                lines.append(elapsed < 60 ? "Updated just now" : "Updated \(AgoFormatter.format(ago: elapsed)) ago")
+            }
         }
         return lines.joined(separator: "\n")
     }

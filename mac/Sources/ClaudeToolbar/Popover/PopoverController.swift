@@ -25,6 +25,9 @@ final class PopoverController: NSObject, NSPopoverDelegate {
     private var lastClosedAt: Date = .distantPast
     private static let reopenGuard: TimeInterval = 0.3
 
+    /// Called after the popover closes, so the host can clear what the user has now read.
+    var onClose: (() -> Void)?
+
     init(model initial: PopoverModel, colors: BarColors, launchAtLogin: Bool,
          onRefresh: @escaping () -> Void, onSettings: @escaping () -> Void, onQuit: @escaping () -> Void,
          onLaunchAtLoginChanged: @escaping (Bool) -> Void) {
@@ -58,6 +61,7 @@ final class PopoverController: NSObject, NSPopoverDelegate {
 
     func popoverDidClose(_ notification: Notification) {
         lastClosedAt = Date()
+        onClose?()
     }
 
     func update(model newModel: PopoverModel, colors: BarColors, launchAtLogin: Bool, sessionSummary: String?) {

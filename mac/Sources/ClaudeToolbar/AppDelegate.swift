@@ -81,6 +81,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onQuit: { NSApp.terminate(nil) },
             onLaunchAtLoginChanged: { [weak self] enabled in self?.setLaunchAtLogin(enabled) })
 
+        // Acknowledged on close, not on open: a badge cleared before the popover is
+        // populated would leave the user reading a stale line right after the chime.
+        popover.onClose = { [weak self] in self?.acknowledgeSessions() }
+
         controller.onLeftClick = { [weak self] in self?.togglePopover() }
         controller.onRightClick = { [weak self] in self?.showMenu() }
         controller.onRender = { [weak self] in
@@ -143,7 +147,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func togglePopover() {
         guard let button = controller.button else { return }
-        if !popover.isShown { acknowledgeSessions() }
         updatePopover()
         popover.toggle(relativeTo: button)
     }
@@ -269,6 +272,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func refreshSessionUi() {
         controller.badge = sessions.badge
+        controller.sessionSummary = sessions.summary
         if popover.isShown { updatePopover() }
         settingsModel?.sessionSummary = sessions.summary
     }
