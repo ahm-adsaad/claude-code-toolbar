@@ -5,6 +5,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using ClaudeToolbar.App.Widget;
 using ClaudeToolbar.Core.Credentials;
+using ClaudeToolbar.Core.Mascot;
 using ClaudeToolbar.Core.Refresh;
 using ClaudeToolbar.Core.Settings;
 using ClaudeToolbar.Core.Usage;
@@ -57,6 +58,7 @@ public partial class SettingsWindow : Window
         var state = new MonitorState(UsageStatus.Ok, snapshot, now, null, new CredentialsState.Missing("preview"));
         var model = WidgetModelBuilder.Build(state, _vm.Settings, now);
         _preview.Render(model, _vm.Settings.Rows, WidgetTheme.FromSettings(_vm.Settings.Appearance));
+        _preview.SetMascot(MascotModelBuilder.Build(model, _vm.Settings.Behavior.Mascot, WaveAnimation.RestAngle), WidgetTheme.FromSettings(_vm.Settings.Appearance));
     }
 
     private void Reset_Click(object sender, RoutedEventArgs e) => _vm.ReloadFrom(AppSettings.CreateDefault());

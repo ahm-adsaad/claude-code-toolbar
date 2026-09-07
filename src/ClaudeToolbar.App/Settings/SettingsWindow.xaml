@@ -135,6 +135,13 @@
                             <CheckBox Content="Hide when a fullscreen app is active" IsChecked="{Binding HideInFullscreen}" />
                             <CheckBox Content="Run at startup" IsChecked="{Binding RunAtStartup}" />
                         </WrapPanel>
+                        <Grid Style="{StaticResource Row}" Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130" /><ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Mascot" Style="{StaticResource FieldLabel}" />
+                            <ComboBox Grid.Column="1" ItemsSource="{Binding MascotOptions}" SelectedValue="{Binding Mascot}" SelectedValuePath="Value" DisplayMemberPath="Label" />
+                        </Grid>
                     </StackPanel>
                 </Border>
 

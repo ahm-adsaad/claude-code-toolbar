@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
 using ClaudeToolbar.Core.Layout;
+using ClaudeToolbar.Core.Mascot;
 using ClaudeToolbar.Core.Settings;
 using ClaudeToolbar.Core.Widget;
 using static ClaudeToolbar.App.Interop.NativeMethods;
@@ -51,6 +52,8 @@ public partial class WidgetWindow : Window
     public void Render(WidgetModel model, RowSettings rows, WidgetTheme theme) => _rows.Render(model, rows, theme);
 
     public void UpdateTimes(WidgetModel model) => _rows.UpdateTimes(model);
+
+    public void UpdateMascot(MascotModel model, WidgetTheme theme) => _rows.SetMascot(model, theme);
 
     public (int Width, int Height) PhysicalSize()
     {

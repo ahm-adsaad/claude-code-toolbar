@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using ClaudeToolbar.Core.Mascot;
 using ClaudeToolbar.Core.Settings;
 using ClaudeToolbar.Core.Widget;
 
@@ -17,6 +18,7 @@ public sealed class UsageRowsControl : Border
     private readonly StackPanel _rows2 = new() { Orientation = Orientation.Vertical, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0), Visibility = Visibility.Collapsed };
     private readonly StackPanel _columns = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
     private readonly Ellipse _staleDot = new() { Width = 6, Height = 6, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(Gap, 0, 0, 0), Visibility = Visibility.Collapsed };
+    private readonly MascotControl _mascot = new() { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0), Visibility = Visibility.Collapsed };
     private readonly List<(TextBlock Time, TextBlock Percent)> _live = new();
 
     public UsageRowsControl()
@@ -24,6 +26,8 @@ public sealed class UsageRowsControl : Border
         var panel = new DockPanel { LastChildFill = true };
         DockPanel.SetDock(_staleDot, Dock.Right);
         panel.Children.Add(_staleDot);
+        DockPanel.SetDock(_mascot, Dock.Left);
+        panel.Children.Add(_mascot);
         _columns.Children.Add(_rows);
         _columns.Children.Add(_rows2);
         panel.Children.Add(_columns);
@@ -62,6 +66,8 @@ public sealed class UsageRowsControl : Border
             target.Children.Add(MakeRow(model.Rows[i], rows, theme));
         }
     }
+
+    public void SetMascot(MascotModel model, WidgetTheme theme) => _mascot.Update(model, theme);
 
     public void UpdateTimes(WidgetModel model)
     {

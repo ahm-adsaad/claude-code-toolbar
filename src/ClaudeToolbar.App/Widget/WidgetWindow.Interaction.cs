@@ -28,6 +28,7 @@ public partial class WidgetWindow
     public event Action? Clicked;
     public event Action? MenuRequested;
     public event Action? FlyoutRequested;
+    public event Action? HoverStarted;
 
     public bool IsFlyoutOpen => _flyout.IsOpen;
 
@@ -41,7 +42,11 @@ public partial class WidgetWindow
             _hoverTimer.Stop();
             FlyoutRequested?.Invoke();
         };
-        Root.MouseEnter += (_, _) => _hoverTimer.Start();
+        Root.MouseEnter += (_, _) =>
+        {
+            _hoverTimer.Start();
+            HoverStarted?.Invoke();
+        };
         Root.MouseLeave += (_, _) =>
         {
             _hoverTimer.Stop();

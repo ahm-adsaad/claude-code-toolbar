@@ -112,6 +112,17 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     public bool HideInFullscreen { get => _s.Behavior.HideInFullscreen; set { _s.Behavior.HideInFullscreen = value; Changed(); } }
     public bool RunAtStartup { get => _s.Behavior.RunAtStartup; set { _s.Behavior.RunAtStartup = value; Changed(); } }
 
+    public sealed record MascotOption(string Value, string Label);
+
+    public IReadOnlyList<MascotOption> MascotOptions { get; } =
+    [
+        new(MascotMode.Full, "Waves on hover and at thresholds"),
+        new(MascotMode.Hover, "Waves on hover only"),
+        new(MascotMode.Off, "Off"),
+    ];
+
+    public string Mascot { get => _s.Behavior.Mascot; set { _s.Behavior.Mascot = MascotMode.Normalize(value); Changed(); } }
+
     // Account (read-only, fed by UpdateAccount)
     public string CredentialsPath { get; private set; } = string.Empty;
     public string TokenStateText { get; private set; } = "Unknown";
