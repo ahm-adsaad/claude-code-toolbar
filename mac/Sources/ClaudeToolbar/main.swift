@@ -1,4 +1,15 @@
-import Foundation
+import AppKit
 import ClaudeToolbarCore
 
-print("ClaudeToolbar \(CoreInfo.version)")
+let arguments = Array(CommandLine.arguments.dropFirst())
+
+if arguments.first == "--version" {
+    print("ClaudeToolbar \(AppInfo.version)")
+    exit(0)
+}
+
+let application = NSApplication.shared
+let appDelegate = AppDelegate()
+application.delegate = appDelegate
+application.setActivationPolicy(.accessory)
+application.run()

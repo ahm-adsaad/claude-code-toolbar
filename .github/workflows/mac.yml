@@ -35,5 +35,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: swift --version
-      - run: swift build -c release
       - run: swift test
+      - run: bash scripts/build-app.sh
+      - run: build/ClaudeToolbar.app/Contents/MacOS/ClaudeToolbar --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ClaudeToolbar-mac
+          path: mac/build/ClaudeToolbar-mac.zip
