@@ -83,7 +83,8 @@ struct SettingsView: View {
             Section("Notifications") {
                 Toggle("Listen for Claude Code session events", isOn: $model.settings.notifications.enabled)
                 LabeledContent("Port") {
-                    TextField("Port", value: model.notificationPort, format: .number)
+                    // Without this a port reads as "47,831" in most locales.
+                    TextField("Port", value: model.notificationPort, format: .number.grouping(.never))
                         .labelsHidden()
                         .frame(width: 90)
                 }
