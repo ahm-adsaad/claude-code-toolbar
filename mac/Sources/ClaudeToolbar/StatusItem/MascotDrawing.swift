@@ -13,6 +13,11 @@ enum MascotDrawing {
     static func draw(_ model: MascotModel, at origin: NSPoint) {
         guard model.visible else { return }
         let rowHeight = cell * 2
+        // The sprite is a grid of hard-edged rectangles: antialiasing them leaves pale seams
+        // between neighbouring cells on a 1x display. The badge below wants it back on.
+        let context = NSGraphicsContext.current
+        let wasAntialiasing = context?.shouldAntialias ?? true
+        context?.shouldAntialias = false
         for spriteCell in ClawdSprite.cells(for: ClawdSprite.poseFor(armAngle: model.armAngle)) {
             let rect = NSRect(
                 x: origin.x + CGFloat(spriteCell.col) * cell,
@@ -21,6 +26,7 @@ enum MascotDrawing {
             (spriteCell.kind == .eye ? eye : body).setFill()
             rect.fill()
         }
+        context?.shouldAntialias = wasAntialiasing
 
         if model.badgeLit, let hex = model.badge.hex, let color = NSColor(argbHex: hex) {
             let radius = CGFloat(ClawdSprite.badgeRadiusCells) * cell

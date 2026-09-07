@@ -24,7 +24,12 @@ final class StatusItemController {
     private var greeted = false
     private var waveStartedAt: Date?
     private var waveTimer: Timer?
+    private var waveFrames = 0
     private var hoverSentinel: HoverSentinel?
+
+    /// The wave timer runs on the wall clock while progress reads `clock`; a stubbed clock must not
+    /// leave it spinning forever, so a wave also ends after a full run's worth of frames.
+    private static let waveFrameBudget = Int(ceil(WaveAnimation.duration * Double(WaveAnimation.framesPerSecond)))
 
     private(set) var state: MonitorState
 
@@ -32,17 +37,24 @@ final class StatusItemController {
     var badge: MascotBadge = .none {
         didSet {
             guard badge != oldValue else { return }
-            render()
+            renderButton()
         }
     }
     /// False while the attention badge is in its blink-off phase.
-    var badgeLit = true
+    var badgeLit = true {
+        didSet {
+            guard badgeLit != oldValue else { return }
+            renderButton()
+        }
+    }
 
     var onLeftClick: (() -> Void)?
     var onRightClick: (() -> Void)?
     var onStateChanged: ((MonitorState) -> Void)?
     /// Called after every re-render (once a second) so other views can refresh countdowns.
     var onRender: (() -> Void)?
+    /// Called at the top of every re-render (once a second) so the host can update the badge before it is drawn.
+    var beforeRender: (() -> Void)?
 
     var item: NSStatusItem { statusItem }
     var button: NSStatusBarButton? { statusItem.button }
@@ -65,7 +77,7 @@ final class StatusItemController {
             }
             let sentinel = HoverSentinel()
             sentinel.onEnter = { [weak self] in
-                Task { @MainActor in self?.startWave(.hover) }
+                Task { @MainActor in _ = self?.startWave(.hover) }
             }
             button.addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: sentinel, userInfo: nil))
             hoverSentinel = sentinel
@@ -117,16 +129,24 @@ final class StatusItemController {
             Log.info("Usage state: \(newState.status)\(detail)")
         }
         let model = StatusItemModelBuilder.build(state: newState, settings: settings, now: clock.now)
-        if let cue = cues.observe(TrackedRows.from(model, snapshot: newState.snapshot)) { startWave(cue) }
-        if newState.status == .ok && !greeted {
+        if let cue = cues.observe(TrackedRows.from(model, snapshot: newState.snapshot)) { _ = startWave(cue) }
+        // Only spend the greeting when the wave really starts: a refused one (hover-only or off
+        // mode, reduce motion) would otherwise mean the user never sees it.
+        if newState.status == .ok && !greeted && startWave(.greeting) {
             greeted = true
-            startWave(.greeting)
         }
         onStateChanged?(newState)
         render()
     }
 
     func render() {
+        beforeRender?()
+        renderButton()
+        onRender?()
+    }
+
+    /// Repaints the menu bar image only. Wave frames use this so a wave does not rebuild the popover 18 times.
+    private func renderButton() {
         guard let button = statusItem.button else { return }
         let model = StatusItemModelBuilder.build(state: state, settings: settings, now: clock.now)
         let mascot = MascotModelBuilder.build(status: model, mascotMode: settings.behavior.mascot,
@@ -134,12 +154,11 @@ final class StatusItemController {
         button.image = StatusItemRenderer.render(model: model, mascot: mascot, settings: settings, appearance: button.effectiveAppearance)
         let text = tooltip(for: model)
         if button.toolTip != text { button.toolTip = text }
-        onRender?()
     }
 
     /// Starts a wave for `cue` unless the mode, reduce motion, or a running wave rules it out.
     func wave(_ cue: MascotCue) {
-        startWave(cue)
+        _ = startWave(cue)
     }
 
     private func currentArmAngle() -> Double {
@@ -147,31 +166,38 @@ final class StatusItemController {
         return WaveAnimation.armAngle(progress: WaveAnimation.progress(startedAt: started, now: clock.now))
     }
 
-    private func startWave(_ cue: MascotCue) {
+    /// True when a wave actually started.
+    @discardableResult
+    private func startWave(_ cue: MascotCue) -> Bool {
         let mode = MascotMode.normalize(settings.behavior.mascot)
-        if mode == MascotMode.off { return }
-        if mode == MascotMode.hover && cue != .hover { return }
-        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion { return }
-        if waveStartedAt != nil { return }
+        if mode == MascotMode.off { return false }
+        if mode == MascotMode.hover && cue != .hover { return false }
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion { return false }
+        if waveStartedAt != nil { return false }
         waveStartedAt = clock.now
+        waveFrames = 0
         let timer = Timer(timeInterval: 1.0 / Double(WaveAnimation.framesPerSecond), repeats: true) { [weak self] _ in
             Task { @MainActor in self?.waveFrame() }
         }
         RunLoop.main.add(timer, forMode: .common)
         waveTimer = timer
-        render()
+        renderButton()
+        return true
     }
 
     private func waveFrame() {
-        if let started = waveStartedAt, WaveAnimation.progress(startedAt: started, now: clock.now) >= 1 {
+        waveFrames += 1
+        if let started = waveStartedAt,
+           WaveAnimation.progress(startedAt: started, now: clock.now) >= 1 || waveFrames >= Self.waveFrameBudget {
             waveStartedAt = nil
         }
         if waveStartedAt == nil { cancelWave() }
-        render()
+        renderButton()
     }
 
     private func cancelWave() {
         waveStartedAt = nil
+        waveFrames = 0
         waveTimer?.invalidate()
         waveTimer = nil
     }
@@ -189,6 +215,11 @@ final class StatusItemController {
             lines.append(elapsed < 60 ? "Updated just now" : "Updated \(AgoFormatter.format(ago: elapsed)) ago")
         }
         return lines.joined(separator: "\n")
+    }
+
+    deinit {
+        timer?.invalidate()
+        waveTimer?.invalidate()
     }
 
     @objc private func buttonClicked(_ sender: Any?) {
