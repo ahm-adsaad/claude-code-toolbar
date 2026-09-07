@@ -40,12 +40,20 @@ public sealed class BehaviorSettings
     public string Mascot { get; set; } = MascotMode.Full;
 }
 
+public sealed class NotificationSettings
+{
+    public bool Enabled { get; set; } = true;
+    public int Port { get; set; } = 47831;
+    public bool Sound { get; set; } = true;
+}
+
 public sealed class AppSettings
 {
     public int Version { get; set; } = 1;
     public AppearanceSettings Appearance { get; set; } = new();
     public RowSettings Rows { get; set; } = new();
     public BehaviorSettings Behavior { get; set; } = new();
+    public NotificationSettings Notifications { get; set; } = new();
 
     public static AppSettings CreateDefault() => new();
 

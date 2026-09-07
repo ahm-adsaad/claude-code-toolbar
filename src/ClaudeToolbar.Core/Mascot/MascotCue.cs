@@ -7,4 +7,7 @@ public enum MascotCue
     Hover,
     Warn,
     Crit,
+    Finished,
+    Failed,
+    Attention,
 }

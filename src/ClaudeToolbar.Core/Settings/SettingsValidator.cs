@@ -25,6 +25,7 @@ public static partial class SettingsValidator
         if (s.Appearance is null) s.Appearance = new AppearanceSettings();
         if (s.Rows is null) s.Rows = new RowSettings();
         if (s.Behavior is null) s.Behavior = new BehaviorSettings();
+        if (s.Notifications is null) s.Notifications = new NotificationSettings();
 
         var a = s.Appearance;
         var d = new AppearanceSettings();
@@ -52,6 +53,8 @@ public static partial class SettingsValidator
         b.RefreshIntervalSeconds = Math.Clamp(b.RefreshIntervalSeconds, 30, 300);
         b.TrayGapPx = Math.Clamp(b.TrayGapPx, 0, 24);
         b.Mascot = MascotMode.Normalize(b.Mascot);
+
+        s.Notifications.Port = Math.Clamp(s.Notifications.Port, 1024, 65535);
 
         s.Version = 1;
         return s;

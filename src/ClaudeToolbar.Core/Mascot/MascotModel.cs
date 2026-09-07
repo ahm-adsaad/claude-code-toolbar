@@ -1,22 +1,34 @@
-using ClaudeToolbar.Core.Formatting;
 using ClaudeToolbar.Core.Settings;
 using ClaudeToolbar.Core.Widget;
 
 namespace ClaudeToolbar.Core.Mascot;
 
-public sealed record MascotModel(bool Visible, BarLevel Level, double ArmAngle, bool Dimmed)
+/// <summary>Session badge shown on Clawd's shoulder, ordered by strength.</summary>
+public enum MascotBadge { None, Working, Finished, Failed, Attention }
+
+public static class MascotBadgeColors
 {
-    public static readonly MascotModel Hidden = new(false, BarLevel.Ok, WaveAnimation.RestAngle, false);
+    public static string? Hex(MascotBadge badge) => badge switch
+    {
+        MascotBadge.Working => "#FF3B82F6",
+        MascotBadge.Finished => "#FF3FB950",
+        MascotBadge.Failed => "#FFF85149",
+        MascotBadge.Attention => "#FFD29922",
+        _ => null,
+    };
+}
+
+public sealed record MascotModel(bool Visible, double ArmAngle, bool Dimmed, MascotBadge Badge, bool BadgeLit)
+{
+    public static readonly MascotModel Hidden = new(false, WaveAnimation.RestAngle, false, MascotBadge.None, false);
 }
 
 public static class MascotModelBuilder
 {
-    public static MascotModel Build(WidgetModel widget, string mascotMode, double armAngle)
+    public static MascotModel Build(WidgetModel widget, string mascotMode, double armAngle, MascotBadge badge = MascotBadge.None, bool badgeLit = true)
     {
         if (MascotMode.Normalize(mascotMode) == MascotMode.Off || widget.Rows.Count == 0)
             return MascotModel.Hidden;
-
-        var level = widget.Rows.Select(r => r.Level).Max();
-        return new MascotModel(true, level, armAngle, widget.Dimmed);
+        return new MascotModel(true, armAngle, widget.Dimmed, badge, badgeLit);
     }
 }
