@@ -15,3 +15,8 @@ TestResults/
 *.log
 .claude/
 docs/superpowers/
+
+# Swift
+mac/.build/
+mac/build/
+.swiftpm/
