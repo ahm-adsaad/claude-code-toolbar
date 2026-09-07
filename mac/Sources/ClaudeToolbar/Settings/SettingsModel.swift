@@ -102,7 +102,9 @@ final class SettingsModel: ObservableObject {
     func previewImage(dark: Bool) -> NSImage {
         let model = StatusItemModelBuilder.build(state: SampleData.state(.ok, snapshot: SampleData.fullSnapshot), settings: settings, now: SampleData.now)
         let appearance = NSAppearance(named: dark ? .darkAqua : .aqua) ?? NSAppearance.currentDrawing()
-        return StatusItemRenderer.render(model: model, settings: settings, appearance: appearance)
+        let mascot = MascotModelBuilder.build(status: model, mascotMode: settings.behavior.mascot,
+                                              armAngle: WaveAnimation.restAngle, badge: .working)
+        return StatusItemRenderer.render(model: model, mascot: mascot, settings: settings, appearance: appearance)
     }
 
     var loginText: String {

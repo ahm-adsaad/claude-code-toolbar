@@ -73,6 +73,11 @@ struct SettingsView: View {
                 if !model.launchAtLoginStatus.isEmpty {
                     Text(model.launchAtLoginStatus).font(.caption).foregroundStyle(.secondary)
                 }
+                Picker("Mascot", selection: $model.settings.behavior.mascot) {
+                    Text("Waves on hover and at thresholds").tag(MascotMode.full)
+                    Text("Waves on hover only").tag(MascotMode.hover)
+                    Text("Off").tag(MascotMode.off)
+                }
             }
 
             Section("Account") {

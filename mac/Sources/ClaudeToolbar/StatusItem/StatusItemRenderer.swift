@@ -46,6 +46,7 @@ enum StatusItemRenderer {
         case text(NSAttributedString)
         case bar(width: CGFloat, fraction: CGFloat, fill: NSColor)
         case dot
+        case mascot(MascotModel)
 
         var width: CGFloat {
             switch self {
@@ -53,14 +54,15 @@ enum StatusItemRenderer {
             case .text(let s): return ceil(s.size().width)
             case .bar(let w, _, _): return w
             case .dot: return StatusItemRenderer.dotDiameter
+            case .mascot: return MascotDrawing.width
             }
         }
     }
 
-    static func render(model: StatusItemModel, settings: AppSettings, appearance: NSAppearance) -> NSImage {
+    static func render(model: StatusItemModel, mascot: MascotModel, settings: AppSettings, appearance: NSAppearance) -> NSImage {
         let textColor = resolvedLabelColor(in: appearance)
         let style = StatusItemStyle(settings: settings)
-        let parts = layout(model: model, style: style, textColor: textColor)
+        let parts = layout(model: model, mascot: mascot, style: style, textColor: textColor)
         let width = max(8, parts.reduce(0) { $0 + $1.width })
 
         let image = NSImage(size: NSSize(width: width, height: height), flipped: false) { rect in
@@ -71,8 +73,13 @@ enum StatusItemRenderer {
         return image
     }
 
-    private static func layout(model: StatusItemModel, style: StatusItemStyle, textColor: NSColor) -> [Part] {
+    private static func layout(model: StatusItemModel, mascot: MascotModel, style: StatusItemStyle, textColor: NSColor) -> [Part] {
         var parts: [Part] = [.gap(edgeInset)]
+
+        if mascot.visible && model.notice == nil {
+            parts.append(.mascot(mascot))
+            parts.append(.gap(partGap + 2))
+        }
 
         if let notice = model.notice {
             parts.append(.text(attributed(notice, color: textColor)))
@@ -145,6 +152,9 @@ enum StatusItemRenderer {
                 textColor.withAlphaComponent(0.7).setFill()
                 NSBezierPath(ovalIn: dotRect).fill()
                 x += dotDiameter
+            case .mascot(let mascot):
+                MascotDrawing.draw(mascot, at: NSPoint(x: x, y: rect.minY + (rect.height - MascotDrawing.height) / 2))
+                x += MascotDrawing.width
             }
         }
         context.restoreGState()

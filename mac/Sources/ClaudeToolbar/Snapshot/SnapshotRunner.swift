@@ -25,8 +25,11 @@ enum SnapshotRunner {
             StatusItemModelBuilder.build(state: SampleData.state(status, snapshot: snapshot), settings: settings, now: SampleData.now)
         }
 
-        func write(_ name: String, _ model: StatusItemModel, settings: AppSettings, dark isDark: Bool) throws {
-            let image = StatusItemRenderer.render(model: model, settings: settings, appearance: isDark ? dark : light)
+        func write(_ name: String, _ model: StatusItemModel, settings: AppSettings, dark isDark: Bool,
+                   armAngle: Double = WaveAnimation.restAngle, badge: MascotBadge = .none, badgeLit: Bool = true) throws {
+            let mascot = MascotModelBuilder.build(status: model, mascotMode: settings.behavior.mascot,
+                                                  armAngle: armAngle, badge: badge, badgeLit: badgeLit)
+            let image = StatusItemRenderer.render(model: model, mascot: mascot, settings: settings, appearance: isDark ? dark : light)
             let data = try ViewSnapshot.pngData(image: image, backdrop: isDark ? ViewSnapshot.darkBackdrop : ViewSnapshot.lightBackdrop)
             try ViewSnapshot.write(data, to: directory, name: name)
         }
@@ -52,6 +55,17 @@ enum SnapshotRunner {
         textOnly.rows.showBar = false
         textOnly.rows.showTime = true
         try write("statusitem-textonly-dark.png", model(.ok, settings: textOnly), settings: textOnly, dark: true)
+
+        try write("statusitem-clawd-wave-dark.png", model(.ok), settings: defaults, dark: true, armAngle: WaveAnimation.armAngle(progress: 0.5))
+        try write("statusitem-clawd-wave2-light.png", model(.ok), settings: defaults, dark: false, armAngle: WaveAnimation.armAngle(progress: 0.06))
+        try write("statusitem-badge-working-dark.png", model(.ok), settings: defaults, dark: true, badge: .working)
+        try write("statusitem-badge-attention-dark.png", model(.ok), settings: defaults, dark: true, badge: .attention)
+        try write("statusitem-badge-finished-light.png", model(.ok), settings: defaults, dark: false, badge: .finished)
+        try write("statusitem-badge-failed-dark.png", model(.ok), settings: defaults, dark: true, badge: .failed)
+
+        var noMascot = defaults
+        noMascot.behavior.mascot = MascotMode.off
+        try write("statusitem-nomascot-dark.png", model(.ok, settings: noMascot), settings: noMascot, dark: true)
     }
 
     static func writePopovers(to directory: URL) throws {
