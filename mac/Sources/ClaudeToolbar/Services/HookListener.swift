@@ -4,7 +4,8 @@ import Network
 /// Minimal loopback HTTP/1.1 server for Claude Code hooks.
 @MainActor
 final class HookListener {
-    static let maxBodyBytes = 64 * 1024
+    /// Read from the connection queue, so it must not be main-actor isolated like the rest of the class.
+    nonisolated static let maxBodyBytes = 64 * 1024
 
     private var listener: NWListener?
     private let queue = DispatchQueue(label: "io.github.ahm-adsaad.ClaudeToolbar.hooks")
@@ -50,12 +51,14 @@ final class HookListener {
                 }
             }
             listener.newConnectionHandler = { [weak self] connection in
-                guard Self.isLoopback(connection.endpoint) else {
+                // Bound once here: capturing the weak variable itself inside the delivery
+                // closure would hand concurrent code a reference to a mutable capture.
+                guard let self, Self.isLoopback(connection.endpoint) else {
                     connection.cancel()
                     return
                 }
                 _ = HookConnection(connection, queue: queue) { body in
-                    Task { @MainActor in self?.onHook?(body) }
+                    Task { @MainActor in self.onHook?(body) }
                 }
             }
             listener.start(queue: queue)
