@@ -9,11 +9,14 @@ final class PopoverController: NSObject, NSPopoverDelegate {
         @Published var popover: PopoverModel
         @Published var colors: BarColors
         @Published var launchAtLogin: Bool
+        /// One line about the live Claude Code sessions, or nil when there are none.
+        @Published var sessionSummary: String?
 
-        init(popover: PopoverModel, colors: BarColors, launchAtLogin: Bool) {
+        init(popover: PopoverModel, colors: BarColors, launchAtLogin: Bool, sessionSummary: String? = nil) {
             self.popover = popover
             self.colors = colors
             self.launchAtLogin = launchAtLogin
+            self.sessionSummary = sessionSummary
         }
     }
 
@@ -57,10 +60,11 @@ final class PopoverController: NSObject, NSPopoverDelegate {
         lastClosedAt = Date()
     }
 
-    func update(model newModel: PopoverModel, colors: BarColors, launchAtLogin: Bool) {
+    func update(model newModel: PopoverModel, colors: BarColors, launchAtLogin: Bool, sessionSummary: String?) {
         if model.popover != newModel { model.popover = newModel }
         if model.colors != colors { model.colors = colors }
         if model.launchAtLogin != launchAtLogin { model.launchAtLogin = launchAtLogin }
+        if model.sessionSummary != sessionSummary { model.sessionSummary = sessionSummary }
     }
 }
 
@@ -75,6 +79,7 @@ struct PopoverRoot: View {
         PopoverView(
             model: model.popover,
             colors: model.colors,
+            sessionSummary: model.sessionSummary,
             launchAtLogin: Binding(get: { model.launchAtLogin }, set: { onLaunchAtLoginChanged($0) }),
             onRefresh: onRefresh,
             onSettings: onSettings,

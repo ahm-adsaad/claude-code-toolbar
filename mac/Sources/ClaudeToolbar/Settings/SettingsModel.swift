@@ -14,10 +14,20 @@ final class SettingsModel: ObservableObject {
     }
     @Published var account: MonitorState
     @Published var launchAtLoginStatus: String
+    /// "Listening on …", "Not listening (disabled)" or the bind error.
+    @Published var listenerStatus: String
+    @Published var hooksInstalled: Bool
+    /// Why the last install or remove failed, if it did.
+    @Published var hooksMessage: String?
+    @Published var sessionSummary: String?
 
     let onApply: (AppSettings) -> Void
     let onSave: (AppSettings) -> Void
     let onRefresh: () -> Void
+    let onInstallHooks: () -> String?
+    let onRemoveHooks: () -> String?
+    let onTestNotification: () -> Void
+    let readHooksInstalled: () -> Bool
     private var pendingSave: DispatchWorkItem?
 
     private static let clockFormatter: DateFormatter = {
@@ -28,13 +38,42 @@ final class SettingsModel: ObservableObject {
     }()
 
     init(settings: AppSettings, account: MonitorState, launchAtLoginStatus: String,
-         onApply: @escaping (AppSettings) -> Void, onSave: @escaping (AppSettings) -> Void, onRefresh: @escaping () -> Void) {
+         onApply: @escaping (AppSettings) -> Void, onSave: @escaping (AppSettings) -> Void, onRefresh: @escaping () -> Void,
+         listenerStatus: String = "", hooksInstalled: Bool = false, sessionSummary: String? = nil,
+         onInstallHooks: @escaping () -> String? = { nil },
+         onRemoveHooks: @escaping () -> String? = { nil },
+         onTestNotification: @escaping () -> Void = {},
+         readHooksInstalled: @escaping () -> Bool = { false }) {
         self.settings = settings
         self.account = account
         self.launchAtLoginStatus = launchAtLoginStatus
+        self.listenerStatus = listenerStatus
+        self.hooksInstalled = hooksInstalled
+        self.sessionSummary = sessionSummary
         self.onApply = onApply
         self.onSave = onSave
         self.onRefresh = onRefresh
+        self.onInstallHooks = onInstallHooks
+        self.onRemoveHooks = onRemoveHooks
+        self.onTestNotification = onTestNotification
+        self.readHooksInstalled = readHooksInstalled
+    }
+
+    func installHooks() {
+        hooksMessage = onInstallHooks()
+        hooksInstalled = readHooksInstalled()
+    }
+
+    func removeHooks() {
+        hooksMessage = onRemoveHooks()
+        hooksInstalled = readHooksInstalled()
+    }
+
+    /// Clamped on commit so a typo cannot ask the listener for a port it can never bind.
+    var notificationPort: Binding<Int> {
+        Binding(
+            get: { self.settings.notifications.port },
+            set: { self.settings.notifications.port = min(max($0, 1024), 65535) })
     }
 
     private func scheduleSave() {

@@ -80,6 +80,31 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Notifications") {
+                Toggle("Listen for Claude Code session events", isOn: $model.settings.notifications.enabled)
+                LabeledContent("Port") {
+                    TextField("Port", value: model.notificationPort, format: .number)
+                        .labelsHidden()
+                        .frame(width: 90)
+                }
+                Toggle("Play a chime when a session needs you or finishes", isOn: $model.settings.notifications.sound)
+                Text(model.listenerStatus).font(.caption).foregroundStyle(.secondary)
+                LabeledContent("Claude Code hooks", value: model.hooksInstalled ? "installed" : "not installed")
+                HStack {
+                    Button("Install hooks") { model.installHooks() }.disabled(model.hooksInstalled)
+                    Button("Remove hooks") { model.removeHooks() }.disabled(!model.hooksInstalled)
+                    Button("Test") { model.onTestNotification() }
+                }
+                if let message = model.hooksMessage {
+                    Text(message).font(.caption).foregroundStyle(.red)
+                }
+                if let summary = model.sessionSummary {
+                    Text(summary).font(.caption).foregroundStyle(.secondary)
+                }
+                Text("Hooks let Claude Code tell the toolbar when a session needs you or has finished. They are added to \(HooksInstaller.settingsPath); a backup is kept next to it.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
             Section("Account") {
                 LabeledContent("Source", value: model.account.credentials.source)
                 LabeledContent("Login", value: model.loginText)

@@ -42,6 +42,7 @@ struct UsageBar: View {
 struct PopoverView: View {
     let model: PopoverModel
     let colors: BarColors
+    var sessionSummary: String?
     @Binding var launchAtLogin: Bool
     let onRefresh: () -> Void
     let onSettings: () -> Void
@@ -54,6 +55,9 @@ struct PopoverView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if model.rows.isEmpty {
+                if let sessionSummary {
+                    Text(sessionSummary).font(.system(size: 11, weight: .medium))
+                }
                 Text(model.statusText)
                     .font(.system(size: 13, weight: .semibold))
                 if showsSignInHint {
@@ -78,6 +82,9 @@ struct PopoverView: View {
                     }
                 }
                 VStack(alignment: .leading, spacing: 2) {
+                    if let sessionSummary {
+                        Text(sessionSummary).font(.system(size: 11, weight: .medium))
+                    }
                     if let updated = model.updatedText {
                         Text(updated).font(.system(size: 11)).foregroundStyle(.secondary)
                     }
