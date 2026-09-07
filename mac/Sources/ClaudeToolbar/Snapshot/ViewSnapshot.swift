@@ -25,11 +25,15 @@ enum ViewSnapshot {
             bitmapDataPlanes: nil,
             pixelsWide: Int(size.width * scale), pixelsHigh: Int(size.height * scale),
             bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-            colorSpaceName: .calibratedRGB, bytesPerRow: 0, bitsPerPixel: 0),
-              let context = NSGraphicsContext(bitmapImageRep: rep) else {
+            colorSpaceName: .calibratedRGB, bytesPerRow: 0, bitsPerPixel: 0) else {
             throw SnapshotError.bitmap
         }
+        // Must be set before the context is created: the context's base CTM is
+        // derived from the point-size-to-pixel-size ratio at construction time.
         rep.size = size
+        guard let context = NSGraphicsContext(bitmapImageRep: rep) else {
+            throw SnapshotError.bitmap
+        }
 
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = context
