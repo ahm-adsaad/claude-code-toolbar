@@ -119,7 +119,7 @@ internal static class NativeMethods
     public static extern int SHQueryUserNotificationState(out int pquns);
 
     public const int SW_RESTORE = 9;
-    public const byte VK_MENU = 0x12;
+    public const byte VK_CONTROL = 0x11;
     public const uint KEYEVENTF_KEYUP = 0x2;
     public const uint FLASHW_ALL = 0x3;
     public const uint FLASHW_TIMERNOFG = 0xC;

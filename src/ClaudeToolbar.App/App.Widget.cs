@@ -67,12 +67,18 @@ public partial class App
         // Acknowledged once the flyout goes away, not when it opens: clearing the badge first
         // would leave the hovering user reading a line that has already been reset to idle.
         _widget.FlyoutHidden += AcknowledgeSessions;
+        // Jump before anything else: acknowledging demotes needs-you to working, and a click on Clawd
+        // picks its target by state. FinishClick then puts the flyout away and acknowledges exactly once.
         _widget.MascotClicked += () =>
         {
             JumpToSession(null);
-            AcknowledgeSessions();
+            FinishClick();
         };
-        _widget.SessionClicked += id => JumpToSession(id);   // the flyout hides first, which already acknowledges
+        _widget.SessionClicked += id =>
+        {
+            JumpToSession(id);
+            FinishClick();
+        };
         _controller = new WidgetController(_widget, new TaskbarTracker(_widget), () => Settings);
         _theme = WidgetTheme.FromSettings(Settings.Appearance);
         RenderWidget(_monitor.State);

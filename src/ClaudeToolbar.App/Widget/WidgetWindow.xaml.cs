@@ -19,11 +19,9 @@ public partial class WidgetWindow : Window
         InitializeComponent();
         Root.Children.Add(_rows);
         InitializeInteraction();
-        _rows.MascotClicked += () =>
-        {
-            HideFlyout();
-            MascotClicked?.Invoke();
-        };
+        // Nothing is hidden or acknowledged here: acknowledging before the jump would demote the very
+        // state that decides where the click goes. The app jumps first, then closes the flyout.
+        _rows.MascotClicked += () => MascotClicked?.Invoke();
     }
 
     public IntPtr Handle { get; private set; }
@@ -33,7 +31,7 @@ public partial class WidgetWindow : Window
     /// <summary>Raw window messages (msg id) for the taskbar tracker.</summary>
     public event Action<int>? ShellMessage;
 
-    /// <summary>A left click on Clawd (the flyout is hidden first).</summary>
+    /// <summary>A left click on Clawd. The flyout is still up and nothing is acknowledged yet.</summary>
     public event Action? MascotClicked;
 
     public void SetMascotTooltip(string? text) => _rows.SetMascotTooltip(text);

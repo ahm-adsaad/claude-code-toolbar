@@ -37,7 +37,7 @@ public partial class WidgetWindow
     public event Action? MenuRequested;
     public event Action? FlyoutRequested;
     public event Action? HoverStarted;
-    /// <summary>A click on one session line in the flyout; the flyout hides right after.</summary>
+    /// <summary>A click on one session line in the flyout. The flyout is still up; the app closes it.</summary>
     public event Action<string>? SessionClicked;
 
     /// <summary>Raised when a flyout that was on screen is dismissed — the user has read it by then.</summary>
@@ -88,6 +88,8 @@ public partial class WidgetWindow
 
     public void ShowFlyout(FlyoutModel model, IReadOnlyList<SessionLineItem> sessions, string? hint, WidgetTheme theme)
     {
+        // A hide that is already pending would close what we are about to show.
+        _hideTimer.Stop();
         _flyoutBorder.Background = theme.Background;
         _flyoutBorder.BorderBrush = theme.BarTrack;
         _flyoutPanel.Children.Clear();
@@ -118,10 +120,11 @@ public partial class WidgetWindow
         block.ToolTip = "Go to this session";
         block.MouseEnter += (_, _) => block.TextDecorations = TextDecorations.Underline;
         block.MouseLeave += (_, _) => block.TextDecorations = null;
+        // The flyout is not closed here: the app closes it once the jump is done, and leaves it up
+        // when the jump had nothing to raise so the reason stays on screen.
         block.MouseLeftButtonUp += (_, e) =>
         {
             e.Handled = true;
-            HideFlyout();
             SessionClicked?.Invoke(session.Id);
         };
         return block;
@@ -129,10 +132,20 @@ public partial class WidgetWindow
 
     public void HideFlyout()
     {
+        var wasOpen = _flyout.IsOpen;
+        CloseFlyout();
+        if (wasOpen) FlyoutHidden?.Invoke();
+    }
+
+    /// <summary>
+    /// Takes the flyout off screen without raising <see cref="FlyoutHidden"/>. The click paths need this:
+    /// they acknowledge the sessions themselves, and acknowledging here as well would both do it twice
+    /// and demote the state that decides where a click on Clawd goes.
+    /// </summary>
+    public void CloseFlyout()
+    {
         _hideTimer.Stop();
-        if (!_flyout.IsOpen) return;
         _flyout.IsOpen = false;
-        FlyoutHidden?.Invoke();
     }
 
     private static SolidColorBrush FrozenBrush(string argb)

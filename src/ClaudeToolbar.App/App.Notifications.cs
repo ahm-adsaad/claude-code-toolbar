@@ -203,8 +203,13 @@ public partial class App
                 ShowJumpHint($"{session.Name}: window closed");
                 return;
             }
-            var raised = WindowActivator.Activate(hwnd);
-            Log.Info($"Jump: {session.Name} → {host.Name}{(raised ? "" : " (foreground refused; taskbar button flashed)")}");
+            var outcome = WindowActivator.Activate(hwnd);
+            Log.Info($"Jump: {session.Name} → {host.Name}{outcome switch
+            {
+                WindowActivation.Raised => string.Empty,
+                WindowActivation.Flashed => " (foreground refused; taskbar button flashed)",
+                _ => " (window closed while jumping)",
+            }}");
         }
         catch (Exception ex)
         {
@@ -212,11 +217,22 @@ public partial class App
         }
     }
 
+    /// <summary>Puts the hint on screen at once rather than leaving the user to discover it on the next hover.</summary>
     private void ShowJumpHint(string text)
     {
         _jumpHint = text;
         _jumpHintUntil = DateTimeOffset.UtcNow + JumpHintLifetime;
-        if (_widget?.IsFlyoutOpen == true) ShowFlyout();
+        if (_widget is not null) ShowFlyout();
+    }
+
+    /// <summary>
+    /// Tidies up after a click that jumped. The flyout stays up while it is explaining why nothing
+    /// happened; otherwise it goes, silently — this is the one and only acknowledge on the click paths.
+    /// </summary>
+    private void FinishClick()
+    {
+        if (JumpHint(DateTimeOffset.UtcNow) is null) _widget?.CloseFlyout();
+        AcknowledgeSessions();
     }
 
     /// <summary>Returns null on success, otherwise a message for the settings window.</summary>
