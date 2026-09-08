@@ -99,10 +99,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         controller.onMascotClick = { [weak self] in
             guard let self else { return }
-            // Before the close: `onClose` acknowledges the sessions, and the jump candidate is
-            // ranked from the states the user has just been shown.
-            self.jumpToSession(id: nil)
-            self.popover.close()
+            // Jump before the close: `onClose` acknowledges the sessions, and the jump candidate
+            // is ranked from the states the user has just been shown.
+            if self.jumpToSession(id: nil) {
+                self.popover.close()
+            } else if self.jumpHint != nil, !self.popover.isShown, let button = self.controller.button {
+                // The jump failed and its hint has nowhere to appear, so put the popover on screen.
+                self.updatePopover()
+                self.popover.toggle(relativeTo: button)
+            }
             self.acknowledgeSessions()
         }
         controller.onLeftClick = { [weak self] in self?.togglePopover() }
@@ -366,6 +371,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             lastPrune = Date()
             sessions.prune(now: Date())
             controller.badge = sessions.badge
+            // A pruned session must not leave a summary or a "Click Clawd to go to …" line
+            // pointing at a session that is no longer there.
+            controller.sessionSummary = sessions.summary
+            controller.jumpHint = jumpTooltip
         }
     }
 

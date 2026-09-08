@@ -66,7 +66,9 @@ struct PopoverView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if model.rows.isEmpty {
-                sessionLines
+                VStack(alignment: .leading, spacing: 2) {
+                    sessionLines
+                }
                 Text(model.statusText)
                     .font(.system(size: 13, weight: .semibold))
                 if showsSignInHint {

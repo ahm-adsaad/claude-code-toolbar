@@ -25,6 +25,9 @@ enum WindowActivator {
     /// With Accessibility granted: raise the window whose title mentions the session, else the first one.
     private static func raiseWindow(pid: pid_t, matching name: String) -> Bool {
         let app = AXUIElementCreateApplication(pid)
+        // Every AX call below is synchronous; without this a wedged host app would freeze the
+        // menu bar for the default timeout on the window list and again on each window title.
+        AXUIElementSetMessagingTimeout(app, 1)
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &value) == .success,
               let windows = value as? [AXUIElement], !windows.isEmpty else { return false }
