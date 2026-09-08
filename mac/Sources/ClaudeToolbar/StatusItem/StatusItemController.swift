@@ -54,12 +54,23 @@ final class StatusItemController {
             renderButton()
         }
     }
+    /// What a click on Clawd will do, shown as the tooltip's last line; nil when there is nowhere to go.
+    var jumpHint: String? {
+        didSet {
+            guard jumpHint != oldValue, !isPreparingRender else { return }
+            renderButton()
+        }
+    }
+    /// Whether the last rendered image had Clawd in it (hidden mode, or a notice, leaves him out).
+    private var mascotShown = false
 
     /// True while `beforeRender` runs: a badge it changes is painted by the render that follows,
     /// so the setters skip their own repaint instead of painting the same frame twice.
     private var isPreparingRender = false
 
     var onLeftClick: (() -> Void)?
+    /// A left click that landed on Clawd; other left clicks still go to `onLeftClick`.
+    var onMascotClick: (() -> Void)?
     var onRightClick: (() -> Void)?
     var onStateChanged: ((MonitorState) -> Void)?
     /// Called after every re-render (once a second) so other views can refresh countdowns.
@@ -164,6 +175,7 @@ final class StatusItemController {
         let model = StatusItemModelBuilder.build(state: state, settings: settings, now: clock.now)
         let mascot = MascotModelBuilder.build(status: model, mascotMode: settings.behavior.mascot,
                                               armAngle: currentArmAngle(), badge: badge, badgeLit: badgeLit)
+        mascotShown = mascot.visible && model.notice == nil
         button.image = StatusItemRenderer.render(model: model, mascot: mascot, settings: settings, appearance: button.effectiveAppearance)
         let text = tooltip(for: model)
         if button.toolTip != text { button.toolTip = text }
@@ -233,6 +245,7 @@ final class StatusItemController {
                 lines.append(elapsed < 60 ? "Updated just now" : "Updated \(AgoFormatter.format(ago: elapsed)) ago")
             }
         }
+        if let jumpHint { lines.append(jumpHint) }
         return lines.joined(separator: "\n")
     }
 
@@ -246,8 +259,19 @@ final class StatusItemController {
         let controlClick = event?.type == .leftMouseUp && event?.modifierFlags.contains(.control) == true
         if event?.type == .rightMouseUp || controlClick {
             onRightClick?()
+        } else if isMascotHit(event) {
+            onMascotClick?()
         } else {
             onLeftClick?()
         }
+    }
+
+    /// True when the click landed on Clawd: the leading part of the centred image, after the edge inset.
+    private func isMascotHit(_ event: NSEvent?) -> Bool {
+        guard mascotShown, let event, let button = statusItem.button, let image = button.image else { return false }
+        let point = button.convert(event.locationInWindow, from: nil)
+        let imageLeft = (button.bounds.width - image.size.width) / 2
+        let left = imageLeft + StatusItemRenderer.edgeInset
+        return point.x >= left && point.x <= left + MascotDrawing.width + StatusItemRenderer.partGap
     }
 }

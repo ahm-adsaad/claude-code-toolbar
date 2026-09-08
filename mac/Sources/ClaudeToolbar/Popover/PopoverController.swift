@@ -2,6 +2,12 @@ import AppKit
 import SwiftUI
 import ClaudeToolbarCore
 
+/// One popover line per live session; clicking it jumps to that session's window.
+struct SessionEntry: Identifiable, Equatable {
+    let id: String
+    let text: String
+}
+
 @MainActor
 final class PopoverController: NSObject, NSPopoverDelegate {
     @MainActor
@@ -9,14 +15,17 @@ final class PopoverController: NSObject, NSPopoverDelegate {
         @Published var popover: PopoverModel
         @Published var colors: BarColors
         @Published var launchAtLogin: Bool
-        /// One line about the live Claude Code sessions, or nil when there are none.
-        @Published var sessionSummary: String?
+        /// One line per live Claude Code session, newest first; empty when there are none.
+        @Published var sessions: [SessionEntry]
+        /// Short-lived note under the sessions, e.g. "api: window closed".
+        @Published var hint: String?
 
-        init(popover: PopoverModel, colors: BarColors, launchAtLogin: Bool, sessionSummary: String? = nil) {
+        init(popover: PopoverModel, colors: BarColors, launchAtLogin: Bool, sessions: [SessionEntry] = [], hint: String? = nil) {
             self.popover = popover
             self.colors = colors
             self.launchAtLogin = launchAtLogin
-            self.sessionSummary = sessionSummary
+            self.sessions = sessions
+            self.hint = hint
         }
     }
 
@@ -30,13 +39,13 @@ final class PopoverController: NSObject, NSPopoverDelegate {
 
     init(model initial: PopoverModel, colors: BarColors, launchAtLogin: Bool,
          onRefresh: @escaping () -> Void, onSettings: @escaping () -> Void, onQuit: @escaping () -> Void,
-         onLaunchAtLoginChanged: @escaping (Bool) -> Void) {
+         onLaunchAtLoginChanged: @escaping (Bool) -> Void, onJump: @escaping (String) -> Void) {
         model = Model(popover: initial, colors: colors, launchAtLogin: launchAtLogin)
         popover.behavior = .transient
         popover.animates = true
         popover.contentViewController = NSHostingController(rootView: PopoverRoot(
             model: model, onRefresh: onRefresh, onSettings: onSettings, onQuit: onQuit,
-            onLaunchAtLoginChanged: onLaunchAtLoginChanged))
+            onLaunchAtLoginChanged: onLaunchAtLoginChanged, onJump: onJump))
         super.init()
         popover.delegate = self
     }
@@ -64,11 +73,12 @@ final class PopoverController: NSObject, NSPopoverDelegate {
         onClose?()
     }
 
-    func update(model newModel: PopoverModel, colors: BarColors, launchAtLogin: Bool, sessionSummary: String?) {
+    func update(model newModel: PopoverModel, colors: BarColors, launchAtLogin: Bool, sessions: [SessionEntry], hint: String?) {
         if model.popover != newModel { model.popover = newModel }
         if model.colors != colors { model.colors = colors }
         if model.launchAtLogin != launchAtLogin { model.launchAtLogin = launchAtLogin }
-        if model.sessionSummary != sessionSummary { model.sessionSummary = sessionSummary }
+        if model.sessions != sessions { model.sessions = sessions }
+        if model.hint != hint { model.hint = hint }
     }
 }
 
@@ -78,12 +88,15 @@ struct PopoverRoot: View {
     let onSettings: () -> Void
     let onQuit: () -> Void
     let onLaunchAtLoginChanged: (Bool) -> Void
+    let onJump: (String) -> Void
 
     var body: some View {
         PopoverView(
             model: model.popover,
             colors: model.colors,
-            sessionSummary: model.sessionSummary,
+            sessions: model.sessions,
+            hint: model.hint,
+            onJump: onJump,
             launchAtLogin: Binding(get: { model.launchAtLogin }, set: { onLaunchAtLoginChanged($0) }),
             onRefresh: onRefresh,
             onSettings: onSettings,

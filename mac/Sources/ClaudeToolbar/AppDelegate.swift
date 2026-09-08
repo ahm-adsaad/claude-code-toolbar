@@ -21,7 +21,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// What the listener was last asked for, so a failed bind is not retried on every settings change.
     private var listenerEnabled: Bool?
     private var listenerPort: Int?
+    private var listenerPortBox: ListenerPortBox?
     private var testSessionWork: DispatchWorkItem?
+    private let hostResolver = HostResolver()
+    /// Short-lived note under the popover's session lines, e.g. "api: window closed".
+    private var jumpHint: String?
+    private var jumpHintWork: DispatchWorkItem?
+    private static let jumpHintLifetime: TimeInterval = 5
 
     private static let testSessionId = "test-session"
     private static let testSessionLifetime: TimeInterval = 10
@@ -79,12 +85,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.openSettings()
             },
             onQuit: { NSApp.terminate(nil) },
-            onLaunchAtLoginChanged: { [weak self] enabled in self?.setLaunchAtLogin(enabled) })
+            onLaunchAtLoginChanged: { [weak self] enabled in self?.setLaunchAtLogin(enabled) },
+            // Jump first, close after: the popover acknowledges the sessions as it closes, and a
+            // hint about a window that is gone has to land while the popover is still on screen.
+            onJump: { [weak self] id in
+                guard let self else { return }
+                if self.jumpToSession(id: id) { self.popover.close() }
+            })
 
         // Acknowledged on close, not on open: a badge cleared before the popover is
         // populated would leave the user reading a stale line right after the chime.
         popover.onClose = { [weak self] in self?.acknowledgeSessions() }
 
+        controller.onMascotClick = { [weak self] in
+            guard let self else { return }
+            // Before the close: `onClose` acknowledges the sessions, and the jump candidate is
+            // ranked from the states the user has just been shown.
+            self.jumpToSession(id: nil)
+            self.popover.close()
+            self.acknowledgeSessions()
+        }
         controller.onLeftClick = { [weak self] in self?.togglePopover() }
         controller.onRightClick = { [weak self] in self?.showMenu() }
         controller.onRender = { [weak self] in
@@ -98,7 +118,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         chime = ChimePlayer()
         let listener = HookListener()
-        listener.onHook = { [weak self] body in self?.handleHook(body) }
+        let resolver = hostResolver
+        let portBox = ListenerPortBox()
+        listenerPortBox = portBox
+        listener.resolveHost = { clientPort in
+            guard let listenerPort = portBox.value else { return nil }
+            return resolver.resolve(clientPort: clientPort, listenerPort: listenerPort)
+        }
+        listener.onHook = { [weak self] body, host in self?.handleHook(body, host: host) }
         listener.onStateChanged = { [weak self] in
             guard let self else { return }
             self.settingsModel?.listenerStatus = self.listenerStatus
@@ -135,6 +162,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         settingsModel?.flushPendingSave()
         testSessionWork?.cancel()
+        jumpHintWork?.cancel()
         hookListener?.stop()
         Log.info("ClaudeToolbar exiting")
         Log.flush()
@@ -153,7 +181,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func updatePopover() {
         popover.update(model: popoverModel(), colors: BarColors(settings: settings),
-                       launchAtLogin: settings.behavior.launchAtLogin, sessionSummary: sessions.summary)
+                       launchAtLogin: settings.behavior.launchAtLogin, sessions: sessionEntries(), hint: jumpHint)
+    }
+
+    private func sessionEntries() -> [SessionEntry] {
+        let now = Date()
+        return sessions.sessions.map { SessionEntry(id: $0.id, text: SessionLine.text($0, now: now)) }
     }
 
     private func popoverModel() -> PopoverModel {
@@ -188,7 +221,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 readHooksInstalled: { [weak self] in
                     guard let self else { return false }
                     return HooksInstaller.isInstalled(url: self.hookUrl)
-                })
+                },
+                accessibilityGranted: WindowActivator.accessibilityGranted,
+                onOpenAccessibility: { WindowActivator.openAccessibilitySettings() })
             settingsModel = model
             settingsWindow = SettingsWindowController(model: model)
         }
@@ -197,6 +232,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsModel?.listenerStatus = listenerStatus
         settingsModel?.hooksInstalled = HooksInstaller.isInstalled(url: hookUrl)
         settingsModel?.sessionSummary = sessions.summary
+        settingsModel?.accessibilityGranted = WindowActivator.accessibilityGranted
         settingsWindow?.show()
     }
 
@@ -235,17 +271,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         listenerEnabled = enabled
         listenerPort = port
         if enabled {
+            listenerPortBox?.value = UInt16(clamping: port)
             listener.start(port: UInt16(clamping: port))
         } else {
+            listenerPortBox?.value = nil
             listener.stop()
         }
         // The hook URL carries the port, so hooks installed for the old one no longer point here.
         if portChanged { settingsModel?.hooksInstalled = HooksInstaller.isInstalled(url: hookUrl) }
     }
 
-    private func handleHook(_ body: String) {
+    private func handleHook(_ body: String, host: SessionHost?) {
         guard let event = HookEventParser.parse(body) else { return }
-        let cue = sessions.apply(event, now: Date())
+        let cue = sessions.apply(event, now: Date(), host: host)
         Log.info("Session \(event.sessionId.prefix(8)): \(event.kind)\(cue.map { " \u{2192} \($0)" } ?? "")")
         if let cue {
             if settings.notifications.sound { chime?.play(Self.chimeKind(cue)) }
@@ -270,11 +308,55 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private var jumpTooltip: String? {
+        guard let s = sessions.jumpCandidate, let host = s.host else { return nil }
+        return "Click Clawd to go to \(s.name) (\(host.name))"
+    }
+
     private func refreshSessionUi() {
         controller.badge = sessions.badge
         controller.sessionSummary = sessions.summary
+        controller.jumpHint = jumpTooltip
         if popover.isShown { updatePopover() }
         settingsModel?.sessionSummary = sessions.summary
+    }
+
+    /// Brings the session's host forward: the given session, or the most urgent one when id is nil.
+    /// True when an app was activated, so a caller can keep the popover open to show a failure.
+    @discardableResult
+    func jumpToSession(id: String?) -> Bool {
+        let session = id.map { sessions.session(id: $0) } ?? sessions.jumpCandidate
+        guard let session else {
+            Log.info("Jump: no session to go to")
+            return false
+        }
+        guard let host = session.host else {
+            Log.info("Jump: \(session.name) has no known window")
+            showJumpHint("\(session.name): window unknown")
+            return false
+        }
+        switch WindowActivator.activate(host: host, sessionName: session.name) {
+        case .activated(let raised):
+            Log.info("Jump: \(session.name) \u{2192} \(host.name)\(raised ? " (window raised)" : "")")
+            return true
+        case .gone:
+            Log.info("Jump: \(session.name) \u{2192} \(host.name) (pid \(host.pid)) is gone")
+            showJumpHint("\(session.name): window closed")
+            return false
+        }
+    }
+
+    private func showJumpHint(_ text: String) {
+        jumpHint = text
+        if popover.isShown { updatePopover() }
+        jumpHintWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.jumpHint = nil
+            if self.popover.isShown { self.updatePopover() }
+        }
+        jumpHintWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.jumpHintLifetime, execute: work)
     }
 
     /// Once a second, from the status item's own tick: blink the attention badge and prune stale sessions.
@@ -295,11 +377,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Fires a demo attention event and ends the sample session shortly after so it does not linger.
     func testNotification() {
-        handleHook(##"{"hook_event_name":"Notification","session_id":"\##(Self.testSessionId)","cwd":"/demo/my-repo","notification_type":"permission_prompt","message":"Claude needs your permission (test)"}"##)
+        handleHook(##"{"hook_event_name":"Notification","session_id":"\##(Self.testSessionId)","cwd":"/demo/my-repo","notification_type":"permission_prompt","message":"Claude needs your permission (test)"}"##, host: nil)
         testSessionWork?.cancel()
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
-            self.handleHook(##"{"hook_event_name":"SessionEnd","session_id":"\##(Self.testSessionId)","reason":"other"}"##)
+            self.handleHook(##"{"hook_event_name":"SessionEnd","session_id":"\##(Self.testSessionId)","reason":"other"}"##, host: nil)
         }
         testSessionWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.testSessionLifetime, execute: work)
@@ -328,5 +410,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         persistSettings(settings)
         controller.updateSettings(settings)
         updatePopover()
+    }
+}
+
+/// The port the listener is bound to, readable from the connection queue.
+final class ListenerPortBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var port: UInt16?
+
+    var value: UInt16? {
+        get { lock.lock(); defer { lock.unlock() }; return port }
+        set { lock.lock(); port = newValue; lock.unlock() }
     }
 }

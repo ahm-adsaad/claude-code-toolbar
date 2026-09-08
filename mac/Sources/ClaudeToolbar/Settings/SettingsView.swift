@@ -104,6 +104,13 @@ struct SettingsView: View {
                 }
                 Text("Hooks let Claude Code tell the toolbar when a session needs you or has finished. They are added to \(HooksInstaller.settingsPath); a backup is kept next to it.")
                     .font(.caption).foregroundStyle(.secondary)
+                Text(model.accessibilityGranted
+                     ? "Clicking Clawd or a session in the popover brings its app forward; Accessibility is granted, so the exact window is raised too."
+                     : "Clicking Clawd or a session in the popover brings its app forward. Grant Accessibility to raise the exact window inside it.")
+                    .font(.caption).foregroundStyle(.secondary)
+                if !model.accessibilityGranted {
+                    Button("Open Accessibility settings") { model.onOpenAccessibility() }
+                }
             }
 
             Section("Account") {

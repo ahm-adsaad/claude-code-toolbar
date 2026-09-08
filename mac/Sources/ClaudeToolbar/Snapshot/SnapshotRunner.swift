@@ -78,9 +78,9 @@ enum SnapshotRunner {
             return f.string(from: date)
         }
 
-        func view(_ status: UsageStatus, snapshot: UsageSnapshot? = SampleData.snapshot, sessionSummary: String? = nil) -> some View {
+        func view(_ status: UsageStatus, snapshot: UsageSnapshot? = SampleData.snapshot, sessions: [SessionEntry] = [], hint: String? = nil) -> some View {
             let model = PopoverModelBuilder.build(state: SampleData.state(status, snapshot: snapshot), settings: defaults, now: SampleData.now, formatClock: clock)
-            return PopoverView(model: model, colors: BarColors(settings: defaults), sessionSummary: sessionSummary,
+            return PopoverView(model: model, colors: BarColors(settings: defaults), sessions: sessions, hint: hint,
                                launchAtLogin: .constant(true),
                                onRefresh: {}, onSettings: {}, onQuit: {})
                 .background(Color(nsColor: .windowBackgroundColor))
@@ -92,13 +92,17 @@ enum SnapshotRunner {
         try ViewSnapshot.write(try ViewSnapshot.pngData(view: view(.stale), appearance: .darkAqua), to: directory, name: "popover-stale-dark.png")
         try ViewSnapshot.write(try ViewSnapshot.pngData(view: view(.expired), appearance: .darkAqua), to: directory, name: "popover-expired-dark.png")
         try ViewSnapshot.write(try ViewSnapshot.pngData(view: view(.noCredentials, snapshot: nil), appearance: .darkAqua), to: directory, name: "popover-nocreds-dark.png")
-        let sessions = "2 sessions · 1 needs you (api) · 1 working (web)"
-        try ViewSnapshot.write(try ViewSnapshot.pngData(view: view(.ok, sessionSummary: sessions), appearance: .darkAqua), to: directory, name: "popover-sessions-dark.png")
+        let sessions = [
+            SessionEntry(id: "s1", text: "api · needs you · VS Code · 2 min"),
+            SessionEntry(id: "s2", text: "web · working · Terminal · now"),
+        ]
+        try ViewSnapshot.write(try ViewSnapshot.pngData(view: view(.ok, sessions: sessions), appearance: .darkAqua), to: directory, name: "popover-sessions-dark.png")
+        try ViewSnapshot.write(try ViewSnapshot.pngData(view: view(.ok, sessions: sessions, hint: "api: window closed"), appearance: .darkAqua), to: directory, name: "popover-sessions-hint-dark.png")
     }
 
     static func writeSettings(to directory: URL) throws {
         let defaults = SettingsValidator.normalize(AppSettings.createDefault())
-        let size = NSSize(width: 440, height: 1800)
+        let size = NSSize(width: 440, height: 1900)
         for (name, appearance, status) in [
             ("settings-light.png", NSAppearance.Name.aqua, UsageStatus.ok),
             ("settings-dark.png", NSAppearance.Name.darkAqua, UsageStatus.ok),
@@ -107,7 +111,8 @@ enum SnapshotRunner {
             let model = SettingsModel(settings: defaults, account: SampleData.state(status), launchAtLoginStatus: "enabled",
                                       onApply: { _ in }, onSave: { _ in }, onRefresh: {},
                                       listenerStatus: "Listening on http://127.0.0.1:47831/hook",
-                                      hooksInstalled: false)
+                                      hooksInstalled: false,
+                                      accessibilityGranted: false)
             let data = try ViewSnapshot.pngData(view: SettingsView(model: model, contentHeight: size.height), appearance: appearance, size: size)
             try ViewSnapshot.write(data, to: directory, name: name)
         }

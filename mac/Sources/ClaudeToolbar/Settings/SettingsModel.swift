@@ -20,6 +20,8 @@ final class SettingsModel: ObservableObject {
     /// Why the last install or remove failed, if it did.
     @Published var hooksMessage: String?
     @Published var sessionSummary: String?
+    /// Whether macOS lets this app raise other apps' windows (System Settings → Privacy & Security → Accessibility).
+    @Published var accessibilityGranted: Bool
 
     let onApply: (AppSettings) -> Void
     let onSave: (AppSettings) -> Void
@@ -28,6 +30,7 @@ final class SettingsModel: ObservableObject {
     let onRemoveHooks: () -> String?
     let onTestNotification: () -> Void
     let readHooksInstalled: () -> Bool
+    let onOpenAccessibility: () -> Void
     private var pendingSave: DispatchWorkItem?
 
     private static let clockFormatter: DateFormatter = {
@@ -43,7 +46,9 @@ final class SettingsModel: ObservableObject {
          onInstallHooks: @escaping () -> String? = { nil },
          onRemoveHooks: @escaping () -> String? = { nil },
          onTestNotification: @escaping () -> Void = {},
-         readHooksInstalled: @escaping () -> Bool = { false }) {
+         readHooksInstalled: @escaping () -> Bool = { false },
+         accessibilityGranted: Bool = false,
+         onOpenAccessibility: @escaping () -> Void = {}) {
         self.settings = settings
         self.account = account
         self.launchAtLoginStatus = launchAtLoginStatus
@@ -57,6 +62,8 @@ final class SettingsModel: ObservableObject {
         self.onRemoveHooks = onRemoveHooks
         self.onTestNotification = onTestNotification
         self.readHooksInstalled = readHooksInstalled
+        self.accessibilityGranted = accessibilityGranted
+        self.onOpenAccessibility = onOpenAccessibility
     }
 
     func installHooks() {

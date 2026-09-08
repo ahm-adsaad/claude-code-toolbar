@@ -21,9 +21,15 @@ var products: [Product] = [
 
 #if os(macOS)
 targets.append(
+    .target(
+        name: "CProcInfo",
+        path: "Sources/CProcInfo"
+    )
+)
+targets.append(
     .executableTarget(
         name: "ClaudeToolbar",
-        dependencies: ["ClaudeToolbarCore"],
+        dependencies: ["ClaudeToolbarCore", "CProcInfo"],
         path: "Sources/ClaudeToolbar",
         swiftSettings: [.swiftLanguageMode(.v5)],
         linkerSettings: [
@@ -31,6 +37,7 @@ targets.append(
             .linkedFramework("SwiftUI"),
             .linkedFramework("ServiceManagement"),
             .linkedFramework("Network"),
+            .linkedFramework("ApplicationServices"),
         ]
     )
 )

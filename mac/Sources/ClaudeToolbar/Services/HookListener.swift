@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import ClaudeToolbarCore
 
 /// Minimal loopback HTTP/1.1 server for Claude Code hooks.
 @MainActor
@@ -15,7 +16,9 @@ final class HookListener {
 
     private(set) var port: UInt16?
     private(set) var error: String?
-    var onHook: ((String) -> Void)?
+    var onHook: ((String, SessionHost?) -> Void)?
+    /// Runs on the connection queue with the client's port, before the event reaches the main actor. Set before `start`.
+    var resolveHost: (@Sendable (UInt16) -> SessionHost?)?
     var onStateChanged: (() -> Void)?
 
     var isListening: Bool { listener != nil && error == nil }
@@ -34,6 +37,7 @@ final class HookListener {
         // Bound to the loopback address only: nothing outside this Mac can reach the hook endpoint.
         parameters.requiredLocalEndpoint = NWEndpoint.hostPort(host: .ipv4(.loopback), port: endpointPort)
         let queue = self.queue
+        let resolveHost = self.resolveHost
         generation += 1
         let generation = self.generation
         do {
@@ -62,14 +66,16 @@ final class HookListener {
                     connection.cancel()
                     return
                 }
-                _ = HookConnection(connection, queue: queue) { body in
+                _ = HookConnection(connection, queue: queue) { body, clientPort in
+                    // Resolved here, off the main actor: the socket-table and process walks take milliseconds.
+                    let host = resolveHost?(clientPort)
                     // The main queue keeps the events in the order they arrived; independent
                     // tasks would not, and a Stop overtaking its Notification would leave the
                     // session in the wrong state.
                     DispatchQueue.main.async {
                         MainActor.assumeIsolated {
                             guard generation == self.generation else { return }
-                            self.onHook?(body)
+                            self.onHook?(body, host)
                         }
                     }
                 }
@@ -109,14 +115,21 @@ final class HookListener {
 /// One inbound request. Keeps itself alive through the connection callbacks until it responds or fails.
 final class HookConnection: @unchecked Sendable {
     private let connection: NWConnection
-    private let deliver: @Sendable (String) -> Void
+    private let deliver: @Sendable (String, UInt16) -> Void
+    /// The remote port of this connection: the hook client's own socket, which identifies its process.
+    private let clientPort: UInt16
     private var buffer = Data()
     private var timeoutWork: DispatchWorkItem?
     private var responded = false
 
-    init(_ connection: NWConnection, queue: DispatchQueue, deliver: @escaping @Sendable (String) -> Void) {
+    init(_ connection: NWConnection, queue: DispatchQueue, deliver: @escaping @Sendable (String, UInt16) -> Void) {
         self.connection = connection
         self.deliver = deliver
+        if case .hostPort(_, let port) = connection.endpoint {
+            clientPort = port.rawValue
+        } else {
+            clientPort = 0
+        }
         connection.start(queue: queue)
         // Weak: a strong capture here would be a cycle through timeoutWork that cancel() does
         // not break. The pending receive keeps this object alive for as long as the read lasts.
@@ -172,7 +185,7 @@ final class HookConnection: @unchecked Sendable {
         let body = String(decoding: buffer[bodyStart..<(bodyStart + contentLength)], as: UTF8.self)
         switch (method, path) {
         case ("POST", "/hook"):
-            deliver(body)
+            deliver(body, clientPort)
             respond(status: "200 OK", body: "")
         case ("GET", "/health"):
             respond(status: "200 OK", body: "ClaudeToolbar \(AppInfo.version)")

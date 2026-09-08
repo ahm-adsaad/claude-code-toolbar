@@ -42,7 +42,9 @@ struct UsageBar: View {
 struct PopoverView: View {
     let model: PopoverModel
     let colors: BarColors
-    var sessionSummary: String?
+    var sessions: [SessionEntry] = []
+    var hint: String?
+    var onJump: (String) -> Void = { _ in }
     @Binding var launchAtLogin: Bool
     let onRefresh: () -> Void
     let onSettings: () -> Void
@@ -52,12 +54,19 @@ struct PopoverView: View {
         model.rows.isEmpty && model.statusText.hasSuffix("run claude")
     }
 
+    /// The live sessions and any jump hint; the same block in both branches of the body.
+    @ViewBuilder
+    private var sessionLines: some View {
+        ForEach(sessions) { SessionRowView(entry: $0, onJump: onJump) }
+        if let hint {
+            Text(hint).font(.system(size: 11)).foregroundStyle(.secondary)
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if model.rows.isEmpty {
-                if let sessionSummary {
-                    Text(sessionSummary).font(.system(size: 11, weight: .medium))
-                }
+                sessionLines
                 Text(model.statusText)
                     .font(.system(size: 13, weight: .semibold))
                 if showsSignInHint {
@@ -82,9 +91,7 @@ struct PopoverView: View {
                     }
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    if let sessionSummary {
-                        Text(sessionSummary).font(.system(size: 11, weight: .medium))
-                    }
+                    sessionLines
                     if let updated = model.updatedText {
                         Text(updated).font(.system(size: 11)).foregroundStyle(.secondary)
                     }
@@ -106,5 +113,25 @@ struct PopoverView: View {
         }
         .padding(14)
         .frame(width: 300)
+    }
+}
+
+/// A session line that reads like text and behaves like a button.
+struct SessionRowView: View {
+    let entry: SessionEntry
+    let onJump: (String) -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: { onJump(entry.id) }) {
+            Text(entry.text)
+                .font(.system(size: 11, weight: .medium))
+                .underline(hovering)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help("Go to this session")
     }
 }
