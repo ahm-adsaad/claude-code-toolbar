@@ -105,4 +105,53 @@ final class SessionTrackerTests: XCTestCase {
         XCTAssertEqual(t.sessions.map(\.id), ["new"])
         XCTAssertEqual(SessionTracker.staleAfter, 12 * 3600)
     }
+
+    func testApplyKeepsTheNewestHostAndIgnoresNil() {
+        let t = SessionTracker()
+        let wt = SessionHost(pid: 70, name: "Windows Terminal", resolvedAt: t0)
+        _ = t.apply(ev(.start), now: t0, host: wt)
+        _ = t.apply(ev(.promptSubmitted), now: t0.addingTimeInterval(60))
+        XCTAssertEqual(t.sessions[0].host, wt)
+        let code = SessionHost(pid: 80, name: "VS Code", resolvedAt: t0.addingTimeInterval(120))
+        _ = t.apply(ev(.stopped), now: t0.addingTimeInterval(120), host: code)
+        XCTAssertEqual(t.session(id: "s1")?.host, code)
+        t.acknowledge()
+        XCTAssertEqual(t.session(id: "s1")?.host, code)
+        XCTAssertNil(t.session(id: "missing"))
+    }
+
+    func testJumpCandidatePrefersTheMostUrgentThenTheNewest() {
+        let t = SessionTracker()
+        let host = SessionHost(pid: 70, name: "Terminal", resolvedAt: t0)
+        _ = t.apply(ev(.stopped, id: "old-finished", cwd: "/a"), now: t0, host: host)
+        _ = t.apply(ev(.needsAttention, id: "waiting", cwd: "/b", message: "permission"), now: t0.addingTimeInterval(-300), host: host)
+        _ = t.apply(ev(.promptSubmitted, id: "busy", cwd: "/c"), now: t0.addingTimeInterval(60), host: host)
+        XCTAssertEqual(t.jumpCandidate?.id, "waiting")
+        t.acknowledge()   // waiting → working (older), old-finished → idle
+        XCTAssertEqual(t.jumpCandidate?.id, "busy")
+        _ = t.apply(ev(.promptSubmitted, id: "waiting", cwd: "/b"), now: t0.addingTimeInterval(120), host: host)
+        XCTAssertEqual(t.jumpCandidate?.id, "waiting")
+    }
+
+    func testJumpCandidateSkipsSessionsWithoutAHost() {
+        let t = SessionTracker()
+        XCTAssertNil(t.jumpCandidate)
+        _ = t.apply(ev(.needsAttention, id: "nohost", message: "x"), now: t0)
+        XCTAssertNil(t.jumpCandidate)
+        _ = t.apply(ev(.promptSubmitted, id: "hosted", cwd: "/h"), now: t0.addingTimeInterval(-60), host: SessionHost(pid: 1, name: "Terminal", resolvedAt: t0))
+        XCTAssertEqual(t.jumpCandidate?.id, "hosted")
+    }
+
+    func testSessionLineShowsNameStateHostAndAge() {
+        let host = SessionHost(pid: 80, name: "VS Code", resolvedAt: t0)
+        let s = SessionInfo(id: "s1", name: "api", state: .needsAttention, updatedAt: t0, message: "permission", host: host)
+        XCTAssertEqual(SessionLine.text(s, now: t0.addingTimeInterval(120)), "api · needs you · VS Code · 2 min")
+        XCTAssertEqual(SessionLine.text(s, now: t0.addingTimeInterval(30)), "api · needs you · VS Code · now")
+        XCTAssertEqual(SessionLine.text(s, now: t0.addingTimeInterval(3 * 3600 + 1200)), "api · needs you · VS Code · 3 h")
+        let hostless = SessionInfo(id: "s1", name: "api", state: .working, updatedAt: t0, message: nil, host: nil)
+        XCTAssertEqual(SessionLine.text(hostless, now: t0), "api · working · now")
+        XCTAssertEqual(SessionLine.stateWord(.idle), "idle")
+        XCTAssertEqual(SessionLine.stateWord(.failed), "failed")
+        XCTAssertEqual(SessionLine.stateWord(.finished), "finished")
+    }
 }

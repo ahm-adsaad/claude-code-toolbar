@@ -10,6 +10,8 @@ public struct SessionInfo: Equatable, Sendable {
     public let state: SessionState
     public let updatedAt: Date
     public let message: String?
+    /// The window-owning process that hosts this session, once a hook has been traced to it.
+    public let host: SessionHost?
 }
 
 /// Per-session state driven by hook events. Not thread-safe: the host calls it on the main actor.
@@ -25,30 +27,57 @@ public final class SessionTracker {
         sessions_.values.sorted { a, b in a.updatedAt == b.updatedAt ? a.id < b.id : a.updatedAt > b.updatedAt }
     }
 
-    public func apply(_ e: SessionEvent, now: Date) -> SessionCue? {
+    public func apply(_ e: SessionEvent, now: Date, host: SessionHost? = nil) -> SessionCue? {
         let existing = sessions_[e.sessionId]
         let name = Self.name(for: e, existing: existing)
+        // The newest resolved host wins; an event without one keeps what was known.
+        let known = host ?? existing?.host
         switch e.kind {
         case .ended:
             sessions_.removeValue(forKey: e.sessionId)
             return nil
         case .start, .info:
-            set(e.sessionId, name, existing?.state ?? .idle, now, existing?.message)
+            set(e.sessionId, name, existing?.state ?? .idle, now, existing?.message, known)
             return nil
         case .promptSubmitted:
-            set(e.sessionId, name, .working, now, nil)
+            set(e.sessionId, name, .working, now, nil, known)
             return nil
         case .needsAttention:
             let alreadyWaiting = existing?.state == .needsAttention
-            set(e.sessionId, name, .needsAttention, now, e.message)
+            set(e.sessionId, name, .needsAttention, now, e.message, known)
             return alreadyWaiting ? nil : .attention
         case .stopped:
             let alreadyFinished = existing?.state == .finished
-            set(e.sessionId, name, .finished, now, nil)
+            set(e.sessionId, name, .finished, now, nil, known)
             return alreadyFinished ? nil : .finished
         case .failed:
-            set(e.sessionId, name, .failed, now, e.detail)
+            set(e.sessionId, name, .failed, now, e.detail, known)
             return .failed
+        }
+    }
+
+    public func session(id: String) -> SessionInfo? { sessions_[id] }
+
+    /// The session a click on Clawd goes to: most urgent state, newest wins ties; sessions without a host cannot be jumped to.
+    public var jumpCandidate: SessionInfo? {
+        sessions_.values
+            .filter { $0.host != nil }
+            .sorted { a, b in
+                let ra = Self.jumpRank(a.state), rb = Self.jumpRank(b.state)
+                if ra != rb { return ra > rb }
+                if a.updatedAt != b.updatedAt { return a.updatedAt > b.updatedAt }
+                return a.id < b.id
+            }
+            .first
+    }
+
+    private static func jumpRank(_ state: SessionState) -> Int {
+        switch state {
+        case .needsAttention: return 4
+        case .failed: return 3
+        case .finished: return 2
+        case .working: return 1
+        case .idle: return 0
         }
     }
 
@@ -62,7 +91,7 @@ public final class SessionTracker {
             default: state = s.state
             }
             if state != s.state || s.message != nil {
-                sessions_[id] = SessionInfo(id: s.id, name: s.name, state: state, updatedAt: s.updatedAt, message: nil)
+                sessions_[id] = SessionInfo(id: s.id, name: s.name, state: state, updatedAt: s.updatedAt, message: nil, host: s.host)
             }
         }
     }
@@ -103,8 +132,8 @@ public final class SessionTracker {
         parts.append(all.count == 1 ? "\(word) (\(names))" : "\(group.count) \(word) (\(names))")
     }
 
-    private func set(_ id: String, _ name: String, _ state: SessionState, _ now: Date, _ message: String?) {
-        sessions_[id] = SessionInfo(id: id, name: name, state: state, updatedAt: now, message: message)
+    private func set(_ id: String, _ name: String, _ state: SessionState, _ now: Date, _ message: String?, _ host: SessionHost?) {
+        sessions_[id] = SessionInfo(id: id, name: name, state: state, updatedAt: now, message: message, host: host)
     }
 
     static func name(for e: SessionEvent, existing: SessionInfo?) -> String {
