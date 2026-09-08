@@ -19,6 +19,11 @@ public partial class WidgetWindow : Window
         InitializeComponent();
         Root.Children.Add(_rows);
         InitializeInteraction();
+        _rows.MascotClicked += () =>
+        {
+            HideFlyout();
+            MascotClicked?.Invoke();
+        };
     }
 
     public IntPtr Handle { get; private set; }
@@ -27,6 +32,11 @@ public partial class WidgetWindow : Window
 
     /// <summary>Raw window messages (msg id) for the taskbar tracker.</summary>
     public event Action<int>? ShellMessage;
+
+    /// <summary>A left click on Clawd (the flyout is hidden first).</summary>
+    public event Action? MascotClicked;
+
+    public void SetMascotTooltip(string? text) => _rows.SetMascotTooltip(text);
 
     protected override void OnSourceInitialized(EventArgs e)
     {

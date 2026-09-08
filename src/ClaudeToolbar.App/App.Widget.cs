@@ -67,6 +67,12 @@ public partial class App
         // Acknowledged once the flyout goes away, not when it opens: clearing the badge first
         // would leave the hovering user reading a line that has already been reset to idle.
         _widget.FlyoutHidden += AcknowledgeSessions;
+        _widget.MascotClicked += () =>
+        {
+            JumpToSession(null);
+            AcknowledgeSessions();
+        };
+        _widget.SessionClicked += id => JumpToSession(id);   // the flyout hides first, which already acknowledges
         _controller = new WidgetController(_widget, new TaskbarTracker(_widget), () => Settings);
         _theme = WidgetTheme.FromSettings(Settings.Appearance);
         RenderWidget(_monitor.State);
@@ -154,9 +160,9 @@ public partial class App
     private void ShowFlyout()
     {
         if (_widget is null || _monitor is null || _theme is null) return;
-        var flyout = FlyoutModelBuilder.Build(_monitor.State, DateTimeOffset.UtcNow, t => t.ToLocalTime().ToString("HH:mm"));
-        if (SessionSummary is { } summary) flyout = flyout with { Lines = [.. flyout.Lines, summary] };
-        _widget.ShowFlyout(flyout, _theme);
+        var now = DateTimeOffset.UtcNow;
+        var flyout = FlyoutModelBuilder.Build(_monitor.State, now, t => t.ToLocalTime().ToString("HH:mm"));
+        _widget.ShowFlyout(flyout, SessionLines(now), JumpHint(now), _theme);
     }
 
     private void Tick()
@@ -206,6 +212,7 @@ public partial class App
     {
         if (_widget is null || _model is null) return;
         _widget.UpdateMascot(MascotModelBuilder.Build(_model, Settings.Behavior.Mascot, CurrentArmAngle(), _badge, _badgeLit));
+        _widget.SetMascotTooltip(JumpTooltip);
     }
 
     private void ObserveCues(MonitorState state)

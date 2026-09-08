@@ -2,6 +2,7 @@ using System.IO;
 using System.Text.Json;
 using System.Windows.Threading;
 using ClaudeToolbar.App.Services;
+using ClaudeToolbar.App.Widget;
 using ClaudeToolbar.Core.Credentials;
 using ClaudeToolbar.Core.Mascot;
 using ClaudeToolbar.Core.Sessions;
@@ -14,6 +15,10 @@ public partial class App
     private static readonly TimeSpan TestSessionLifetime = TimeSpan.FromSeconds(10);
 
     private readonly SessionTracker _sessions = new();
+    private readonly HostResolver _hostResolver = new();
+    private string? _jumpHint;
+    private DateTimeOffset _jumpHintUntil = DateTimeOffset.MinValue;
+    private static readonly TimeSpan JumpHintLifetime = TimeSpan.FromSeconds(5);
     private HookListener? _hooks;
     private ChimePlayer? _chime;
     private DispatcherTimer? _testSessionTimer;
@@ -70,7 +75,13 @@ public partial class App
         if (_hooks is null)
         {
             _hooks = new HookListener();
-            _hooks.HookReceived += body => Dispatcher.InvokeAsync(() => HandleHookBody(body));
+            var hooks = _hooks;
+            hooks.HookReceived += (body, clientPort) =>
+            {
+                // On the listener's thread on purpose: the TCP-table and process walks must never run on the UI thread.
+                var host = hooks.Port is { } listenerPort ? _hostResolver.Resolve(clientPort, listenerPort) : null;
+                Dispatcher.InvokeAsync(() => HandleHookBody(body, host));
+            };
         }
         _hooksInstalled = ReadHooksInstalled();
         ApplyListenerSettings();
@@ -105,13 +116,13 @@ public partial class App
         _chime = null;
     }
 
-    private void HandleHookBody(string body)
+    private void HandleHookBody(string body, SessionHost? host = null)
     {
         try
         {
             var e = HookEventParser.Parse(body);
             if (e is null) return;
-            var cue = _sessions.Apply(e, DateTimeOffset.UtcNow);
+            var cue = _sessions.Apply(e, DateTimeOffset.UtcNow, host);
             Log.Info($"Session {e.SessionId[..Math.Min(8, e.SessionId.Length)]} ({_sessions.Sessions.FirstOrDefault(s => s.Id == e.SessionId)?.Name}): {e.Kind}{(cue is null ? "" : " → " + cue)}");
             if (cue is { } c) React(c);
             RefreshSessionUi();
@@ -157,6 +168,55 @@ public partial class App
         if (_sessions.Badge == MascotBadge.None) return;
         _sessions.Acknowledge();
         RefreshSessionUi();
+    }
+
+    /// <summary>What a click on Clawd will do, for his tooltip; null when there is nowhere to go.</summary>
+    public string? JumpTooltip => _sessions.JumpCandidate is { Host: { } host } s ? $"Click to go to {s.Name} ({host.Name})" : null;
+
+    /// <summary>The flyout lines for the live sessions, newest first.</summary>
+    public IReadOnlyList<SessionLineItem> SessionLines(DateTimeOffset now) =>
+        _sessions.Sessions.Select(s => new SessionLineItem(s.Id, SessionLine.Text(s, now))).ToList();
+
+    public string? JumpHint(DateTimeOffset now) => now < _jumpHintUntil ? _jumpHint : null;
+
+    /// <summary>Brings the session's host window forward: the given session, or the most urgent one when id is null.</summary>
+    public void JumpToSession(string? id)
+    {
+        var session = id is null ? _sessions.JumpCandidate : _sessions.Session(id);
+        if (session is null)
+        {
+            Log.Info("Jump: no session to go to");
+            return;
+        }
+        if (session.Host is not { } host)
+        {
+            Log.Info($"Jump: {session.Name} has no known window");
+            ShowJumpHint($"{session.Name}: window unknown");
+            return;
+        }
+        try
+        {
+            var hwnd = WindowLocator.Find(host, session.Name);
+            if (hwnd == IntPtr.Zero)
+            {
+                Log.Info($"Jump: {session.Name} → {host.Name} (pid {host.Pid}) has no window");
+                ShowJumpHint($"{session.Name}: window closed");
+                return;
+            }
+            var raised = WindowActivator.Activate(hwnd);
+            Log.Info($"Jump: {session.Name} → {host.Name}{(raised ? "" : " (foreground refused; taskbar button flashed)")}");
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Jump failed", ex);
+        }
+    }
+
+    private void ShowJumpHint(string text)
+    {
+        _jumpHint = text;
+        _jumpHintUntil = DateTimeOffset.UtcNow + JumpHintLifetime;
+        if (_widget?.IsFlyoutOpen == true) ShowFlyout();
     }
 
     /// <summary>Returns null on success, otherwise a message for the settings window.</summary>

@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using ClaudeToolbar.Core.Mascot;
@@ -21,6 +22,11 @@ public sealed class UsageRowsControl : Border
     private readonly MascotControl _mascot = new() { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0), Visibility = Visibility.Collapsed };
     private readonly List<(TextBlock Time, TextBlock Percent)> _live = new();
 
+    /// <summary>A left click on Clawd. Handled here so the widget's own click (which opens Settings) does not also fire.</summary>
+    public event Action? MascotClicked;
+
+    private string? _mascotTooltip;
+
     public UsageRowsControl()
     {
         var panel = new DockPanel { LastChildFill = true };
@@ -28,6 +34,11 @@ public sealed class UsageRowsControl : Border
         panel.Children.Add(_staleDot);
         DockPanel.SetDock(_mascot, Dock.Left);
         panel.Children.Add(_mascot);
+        _mascot.MouseLeftButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            MascotClicked?.Invoke();
+        };
         _columns.Children.Add(_rows);
         _columns.Children.Add(_rows2);
         panel.Children.Add(_columns);
@@ -68,6 +79,14 @@ public sealed class UsageRowsControl : Border
     }
 
     public void SetMascot(MascotModel model) => _mascot.Update(model);
+
+    public void SetMascotTooltip(string? text)
+    {
+        if (text == _mascotTooltip) return;
+        _mascotTooltip = text;
+        _mascot.ToolTip = text;
+        _mascot.Cursor = text is null ? null : Cursors.Hand;
+    }
 
     public void UpdateTimes(WidgetModel model)
     {

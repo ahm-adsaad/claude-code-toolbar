@@ -15,7 +15,8 @@ public sealed class HookListener : IDisposable
     private TcpListener? _listener;
     private CancellationTokenSource? _cts;
 
-    public event Action<string>? HookReceived;
+    /// <summary>Body of a POST /hook and the client's ephemeral port, raised on a thread-pool thread while the connection is open.</summary>
+    public event Action<string, int>? HookReceived;
 
     public int? Port { get; private set; }
     public string? Error { get; private set; }
@@ -83,6 +84,7 @@ public sealed class HookListener : IDisposable
         {
             try
             {
+                var clientPort = (client.Client.RemoteEndPoint as IPEndPoint)?.Port ?? 0;
                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 timeout.CancelAfter(ReadTimeout);
                 var stream = client.GetStream();
@@ -160,7 +162,7 @@ public sealed class HookListener : IDisposable
 
                 if (method == "POST" && path == "/hook")
                 {
-                    HookReceived?.Invoke(body);
+                    HookReceived?.Invoke(body, clientPort);
                     await RespondAsync(stream, "200 OK", "");
                 }
                 else if (method == "GET" && path == "/health")

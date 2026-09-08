@@ -13,6 +13,7 @@ public sealed class MascotControl : FrameworkElement
 
     private static readonly Brush Body = Frozen(ClawdSprite.BodyColor);
     private static readonly Brush Eye = Frozen(ClawdSprite.EyeColor);
+    private static readonly Brush HitArea = Frozen("#01000000");
     private static readonly Dictionary<MascotBadge, Brush> BadgeBrushes = Enum.GetValues<MascotBadge>()
         .Where(b => MascotBadgeColors.Hex(b) is not null)
         .ToDictionary(b => b, b => (Brush)Frozen(MascotBadgeColors.Hex(b)!));
@@ -23,7 +24,7 @@ public sealed class MascotControl : FrameworkElement
     {
         Width = SpriteWidth;
         Height = SpriteHeight;
-        IsHitTestVisible = false;
+        IsHitTestVisible = true;
         SnapsToDevicePixels = true;
         RenderOptions.SetEdgeMode(this, EdgeMode.Aliased);
     }
@@ -39,6 +40,8 @@ public sealed class MascotControl : FrameworkElement
     protected override void OnRender(DrawingContext dc)
     {
         if (!_model.Visible) return;
+        // Alpha 1 of 255: invisible, but hit-testable across the whole sprite, gaps included.
+        dc.DrawRectangle(HitArea, null, new Rect(0, 0, SpriteWidth, SpriteHeight));
         foreach (var cell in ClawdSprite.Cells(ClawdSprite.PoseFor(_model.ArmAngle)))
         {
             dc.DrawRectangle(cell.Kind == CellKind.Eye ? Eye : Body, null,
