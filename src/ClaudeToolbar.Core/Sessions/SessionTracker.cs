@@ -6,7 +6,7 @@ public enum SessionState { Idle, Working, NeedsAttention, Finished, Failed }
 
 public enum SessionCue { Finished, Failed, Attention }
 
-public sealed record SessionInfo(string Id, string Name, SessionState State, DateTimeOffset UpdatedAt, string? Message);
+public sealed record SessionInfo(string Id, string Name, SessionState State, DateTimeOffset UpdatedAt, string? Message, SessionHost? Host = null);
 
 /// <summary>Per-session state driven by hook events. Not thread-safe: the host calls it on its UI thread.</summary>
 public sealed class SessionTracker
@@ -18,39 +18,60 @@ public sealed class SessionTracker
     /// <summary>Newest first.</summary>
     public IReadOnlyList<SessionInfo> Sessions => _sessions.Values.OrderByDescending(s => s.UpdatedAt).ThenBy(s => s.Id, StringComparer.Ordinal).ToList();
 
-    public SessionCue? Apply(SessionEvent e, DateTimeOffset now)
+    public SessionCue? Apply(SessionEvent e, DateTimeOffset now, SessionHost? host = null)
     {
         var existing = _sessions.GetValueOrDefault(e.SessionId);
         var name = NameFor(e, existing);
+        // The newest resolved host wins; an event without one keeps what was known.
+        var known = host ?? existing?.Host;
         switch (e.Kind)
         {
             case SessionEventKind.Ended:
                 _sessions.Remove(e.SessionId);
                 return null;
             case SessionEventKind.Start:
-                Set(e.SessionId, name, existing?.State ?? SessionState.Idle, now, existing?.Message);
+                Set(e.SessionId, name, existing?.State ?? SessionState.Idle, now, existing?.Message, known);
                 return null;
             case SessionEventKind.Info:
-                Set(e.SessionId, name, existing?.State ?? SessionState.Idle, now, existing?.Message);
+                Set(e.SessionId, name, existing?.State ?? SessionState.Idle, now, existing?.Message, known);
                 return null;
             case SessionEventKind.PromptSubmitted:
-                Set(e.SessionId, name, SessionState.Working, now, null);
+                Set(e.SessionId, name, SessionState.Working, now, null, known);
                 return null;
             case SessionEventKind.NeedsAttention:
                 var alreadyWaiting = existing?.State == SessionState.NeedsAttention;
-                Set(e.SessionId, name, SessionState.NeedsAttention, now, e.Message);
+                Set(e.SessionId, name, SessionState.NeedsAttention, now, e.Message, known);
                 return alreadyWaiting ? null : SessionCue.Attention;
             case SessionEventKind.Stopped:
                 var alreadyFinished = existing?.State == SessionState.Finished;
-                Set(e.SessionId, name, SessionState.Finished, now, null);
+                Set(e.SessionId, name, SessionState.Finished, now, null, known);
                 return alreadyFinished ? null : SessionCue.Finished;
             case SessionEventKind.Failed:
-                Set(e.SessionId, name, SessionState.Failed, now, e.Detail);
+                Set(e.SessionId, name, SessionState.Failed, now, e.Detail, known);
                 return SessionCue.Failed;
             default:
                 return null;
         }
     }
+
+    public SessionInfo? Session(string id) => _sessions.GetValueOrDefault(id);
+
+    /// <summary>The session a click on Clawd goes to: most urgent state, newest wins ties; sessions without a host cannot be jumped to.</summary>
+    public SessionInfo? JumpCandidate => _sessions.Values
+        .Where(s => s.Host is not null)
+        .OrderByDescending(s => JumpRank(s.State))
+        .ThenByDescending(s => s.UpdatedAt)
+        .ThenBy(s => s.Id, StringComparer.Ordinal)
+        .FirstOrDefault();
+
+    private static int JumpRank(SessionState state) => state switch
+    {
+        SessionState.NeedsAttention => 4,
+        SessionState.Failed => 3,
+        SessionState.Finished => 2,
+        SessionState.Working => 1,
+        _ => 0,
+    };
 
     /// <summary>The user looked: finished and failed sessions go idle, waiting ones are assumed handled.</summary>
     public void Acknowledge()
@@ -111,8 +132,8 @@ public sealed class SessionTracker
         parts.Add(all.Count == 1 ? $"{word} ({names})" : $"{group.Count} {word} ({names})");
     }
 
-    private void Set(string id, string name, SessionState state, DateTimeOffset now, string? message) =>
-        _sessions[id] = new SessionInfo(id, name, state, now, message);
+    private void Set(string id, string name, SessionState state, DateTimeOffset now, string? message, SessionHost? host) =>
+        _sessions[id] = new SessionInfo(id, name, state, now, message, host);
 
     internal static string NameFor(SessionEvent e, SessionInfo? existing)
     {

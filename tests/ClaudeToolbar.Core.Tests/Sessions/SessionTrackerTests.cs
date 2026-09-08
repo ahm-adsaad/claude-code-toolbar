@@ -127,4 +127,60 @@ public class SessionTrackerTests
         Assert.Equal(["new"], t.Sessions.Select(s => s.Id).ToList());
         Assert.Equal(TimeSpan.FromHours(12), SessionTracker.StaleAfter);
     }
+
+    [Fact]
+    public void ApplyKeepsTheNewestHostAndIgnoresNull()
+    {
+        var t = new SessionTracker();
+        var wt = new SessionHost(70, "Windows Terminal", T0);
+        t.Apply(Ev(SessionEventKind.Start), T0, wt);
+        t.Apply(Ev(SessionEventKind.PromptSubmitted), T0.AddMinutes(1));
+        Assert.Equal(wt, t.Sessions[0].Host);
+        var code = new SessionHost(80, "VS Code", T0.AddMinutes(2));
+        t.Apply(Ev(SessionEventKind.Stopped), T0.AddMinutes(2), code);
+        Assert.Equal(code, t.Session("s1")!.Host);
+        t.Acknowledge();
+        Assert.Equal(code, t.Session("s1")!.Host);
+        Assert.Null(t.Session("missing"));
+    }
+
+    [Fact]
+    public void JumpCandidatePrefersTheMostUrgentThenTheNewest()
+    {
+        var t = new SessionTracker();
+        var host = new SessionHost(70, "Windows Terminal", T0);
+        t.Apply(Ev(SessionEventKind.Stopped, id: "old-finished", cwd: "C:\\a"), T0, host);
+        t.Apply(Ev(SessionEventKind.NeedsAttention, id: "waiting", cwd: "C:\\b", message: "permission"), T0.AddMinutes(-5), host);
+        t.Apply(Ev(SessionEventKind.PromptSubmitted, id: "busy", cwd: "C:\\c"), T0.AddMinutes(1), host);
+        Assert.Equal("waiting", t.JumpCandidate!.Id);
+        t.Acknowledge();   // waiting → working (older), old-finished → idle
+        Assert.Equal("busy", t.JumpCandidate!.Id);
+        t.Apply(Ev(SessionEventKind.PromptSubmitted, id: "waiting", cwd: "C:\\b"), T0.AddMinutes(2), host);
+        Assert.Equal("waiting", t.JumpCandidate!.Id);
+    }
+
+    [Fact]
+    public void JumpCandidateSkipsSessionsWithoutAHost()
+    {
+        var t = new SessionTracker();
+        Assert.Null(t.JumpCandidate);
+        t.Apply(Ev(SessionEventKind.NeedsAttention, id: "nohost", message: "x"), T0);
+        Assert.Null(t.JumpCandidate);
+        t.Apply(Ev(SessionEventKind.PromptSubmitted, id: "hosted", cwd: "C:\\h"), T0.AddMinutes(-1), new SessionHost(1, "Console", T0));
+        Assert.Equal("hosted", t.JumpCandidate!.Id);
+    }
+
+    [Fact]
+    public void SessionLineShowsNameStateHostAndAge()
+    {
+        var host = new SessionHost(80, "VS Code", T0);
+        var s = new SessionInfo("s1", "api", SessionState.NeedsAttention, T0, "permission", host);
+        Assert.Equal("api · needs you · VS Code · 2 min", SessionLine.Text(s, T0.AddMinutes(2)));
+        Assert.Equal("api · needs you · VS Code · now", SessionLine.Text(s, T0.AddSeconds(30)));
+        Assert.Equal("api · needs you · VS Code · 3 h", SessionLine.Text(s, T0.AddHours(3).AddMinutes(20)));
+        Assert.Equal("api · working · now", SessionLine.Text(s with { State = SessionState.Working, Host = null }, T0));
+        Assert.Equal("api · idle · now", SessionLine.Text(s with { State = SessionState.Idle, Host = null }, T0));
+        Assert.Equal("api · failed · now", SessionLine.Text(s with { State = SessionState.Failed, Host = null }, T0));
+        Assert.Equal("api · finished · now", SessionLine.Text(s with { State = SessionState.Finished, Host = null }, T0));
+    }
 }
