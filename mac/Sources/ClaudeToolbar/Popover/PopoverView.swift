@@ -66,8 +66,12 @@ struct PopoverView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if model.rows.isEmpty {
-                VStack(alignment: .leading, spacing: 2) {
-                    sessionLines
+                // Only when there is something to show: an empty stack still takes the
+                // outer 12 pt of spacing and would push the status line down.
+                if !sessions.isEmpty || hint != nil {
+                    VStack(alignment: .leading, spacing: 2) {
+                        sessionLines
+                    }
                 }
                 Text(model.statusText)
                     .font(.system(size: 13, weight: .semibold))
