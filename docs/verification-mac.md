@@ -37,3 +37,9 @@ Use the `ClaudeToolbar-mac` artifact from the newest `mac` workflow run — the 
 | 31 | Needs-you cue | In a terminal run `claude` in a project and ask it to run a command that needs permission: within a second Clawd's badge blinks amber, he waves, a two-note chime plays, and clicking the item opens the popover with "1 session · needs you (project)" | |
 | 32 | Finished cue | Answer the prompt and let Claude finish: badge turns green with a single soft chime; click the item: the popover shows "1 session · finished (project)"; close the popover and the badge disappears | |
 | 33 | Sound off and remove | Settings → untick "Play a chime": repeat 31 with no sound; Remove hooks: status says not installed and the six hooks are gone from settings.json | |
+| 34 | Session lines | With two Claude Code sessions running (one in Terminal, one in VS Code) click the item: the popover lists both as `project · state · host · age` with the right host names | |
+| 35 | Jump from a line | Click the VS Code line: the popover closes and VS Code comes to the front; click the Terminal line: Terminal comes forward | |
+| 36 | Jump from Clawd | Ask one session to run a command that needs permission, put another app in front, then click Clawd himself (the left part of the item): the waiting session's app comes to the front and the badge clears; the item's tooltip ends with "Click Clawd to go to <project> (<host>)" | |
+| 37 | Accessibility | Settings → Notifications shows the Accessibility caption and button; grant it, reopen Settings: the caption says it is granted; with two VS Code windows open, jumping raises the one whose title names the project | |
+| 38 | Closed window | Quit the terminal app of a session that is still listed and click its line: the popover shows "<project>: window closed" for a few seconds | |
+| 39 | Performance | Activity Monitor: idle CPU 0 %, memory unchanged from before this feature; clicks cost no visible CPU | |
