@@ -48,7 +48,7 @@ This works wherever Claude Code hooks fire: the terminal, the VS Code and JetBra
 7d ▮▮▯▯▯▯▯▯▯▯ 18%  3d 4h
 ```
 
-Hover for exact reset times and the last update time. Left-click opens settings. Right-click for refresh / settings / run at startup / exit. A tray icon offers the same menu.
+Hover for exact reset times and the last update time. Left-click (away from Clawd) opens settings. Right-click for refresh / settings / run at startup / exit. A tray icon offers the same menu.
 
 ### How it signs in
 
@@ -100,7 +100,7 @@ dotnet publish src/ClaudeToolbar.App -c Release -r win-x64 --self-contained -p:P
 5h ▬▬▬▬▬▬▬▬ 42%   7d ▬▬▬▬▬▬▬▬ 18%
 ```
 
-One line in the menu bar with compact bars and percentages (reset times can be added in Settings). Click it for the full detail: each window with its bar, reset countdown and clock time, the last update time and the account state, plus Refresh now, Settings, a Launch at login switch and Quit. Right-click (or Control-click) for the same actions as a menu.
+One line in the menu bar with compact bars and percentages (reset times can be added in Settings). Click it (away from Clawd) for the full detail: each window with its bar, reset countdown and clock time, the last update time and the account state, plus Refresh now, Settings, a Launch at login switch and Quit. Right-click (or Control-click) for the same actions as a menu.
 
 ### How it signs in
 
