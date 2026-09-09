@@ -28,6 +28,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var jumpHint: String?
     private var jumpHintWork: DispatchWorkItem?
     private static let jumpHintLifetime: TimeInterval = 5
+    /// The jump candidate as it stood when the popover closed, kept for the mouse-up that follows.
+    private var lastCandidateBeforeClose: (id: String, at: Date)?
 
     private static let testSessionId = "test-session"
     private static let testSessionLifetime: TimeInterval = 10
@@ -95,13 +97,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Acknowledged on close, not on open: a badge cleared before the popover is
         // populated would leave the user reading a stale line right after the chime.
-        popover.onClose = { [weak self] in self?.acknowledgeSessions() }
+        // The close runs on the mouse-down that dismisses a transient popover, before the
+        // status item's mouse-up action, so note the candidate before acknowledging demotes it.
+        popover.onClose = { [weak self] in
+            guard let self else { return }
+            if let candidate = self.sessions.jumpCandidate {
+                self.lastCandidateBeforeClose = (id: candidate.id, at: Date())
+            } else {
+                self.lastCandidateBeforeClose = nil
+            }
+            self.acknowledgeSessions()
+        }
 
         controller.onMascotClick = { [weak self] in
             guard let self else { return }
-            // Jump before the close: `onClose` acknowledges the sessions, and the jump candidate
-            // is ranked from the states the user has just been shown.
-            if self.jumpToSession(id: nil) {
+            // Jump to what the user was actually shown: the popover that this same click closed has
+            // already acknowledged the sessions, so ranking them again would pick a demoted state.
+            let remembered = self.candidateFromTheClosingClick()
+            self.lastCandidateBeforeClose = nil
+            if self.jumpToSession(id: remembered) {
                 self.popover.close()
             } else if self.jumpHint != nil, !self.popover.isShown, let button = self.controller.button {
                 // The jump failed and its hint has nowhere to appear, so put the popover on screen.
@@ -326,6 +340,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsModel?.sessionSummary = sessions.summary
     }
 
+    /// The candidate noted as the popover closed, while that close is still part of this click;
+    /// nil when the click did not follow a close, leaving the jump to rank the sessions itself.
+    private func candidateFromTheClosingClick() -> String? {
+        guard let remembered = lastCandidateBeforeClose,
+              Date().timeIntervalSince(remembered.at) < PopoverController.reopenGuard else { return nil }
+        return remembered.id
+    }
+
     /// Brings the session's host forward: the given session, or the most urgent one when id is nil.
     /// True when an app was activated, so a caller can keep the popover open to show a failure.
     @discardableResult
@@ -333,6 +355,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let session = id.map { sessions.session(id: $0) } ?? sessions.jumpCandidate
         guard let session else {
             Log.info("Jump: no session to go to")
+            // The session that was asked for - a line, or the candidate the popover was showing -
+            // has gone since it was drawn; say so rather than doing nothing.
+            if id != nil { showJumpHint("session ended") }
             return false
         }
         guard let host = session.host else {
@@ -375,6 +400,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // pointing at a session that is no longer there.
             controller.sessionSummary = sessions.summary
             controller.jumpHint = jumpTooltip
+            settingsModel?.sessionSummary = sessions.summary
         }
     }
 

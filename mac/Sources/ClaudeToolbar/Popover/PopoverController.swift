@@ -32,7 +32,9 @@ final class PopoverController: NSObject, NSPopoverDelegate {
     private let popover = NSPopover()
     private let model: Model
     private var lastClosedAt: Date = .distantPast
-    private static let reopenGuard: TimeInterval = 0.3
+    /// How long a close and the click that caused it are treated as one gesture: the transient
+    /// popover closes on mouse-down, the status item acts on mouse-up.
+    static let reopenGuard: TimeInterval = 0.3
 
     /// Called after the popover closes, so the host can clear what the user has now read.
     var onClose: (() -> Void)?

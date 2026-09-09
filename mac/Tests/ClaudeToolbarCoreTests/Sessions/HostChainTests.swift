@@ -71,6 +71,11 @@ final class HostChainTests: XCTestCase {
         XCTAssertNil(HostChain.resolve(startPid: 100, table: w, catalog: KnownHosts.windows))
     }
 
+    func testAStopWordOnTheStartNodeIsNotAHost() {
+        let t = table(p(100, 1, "com.apple.finder", window: true))
+        XCTAssertNil(HostChain.resolve(startPid: 100, table: t, catalog: KnownHosts.mac))
+    }
+
     func testMissingParentOrMissingStartStopsTheWalk() {
         XCTAssertNil(HostChain.resolve(startPid: 100, table: table(p(100, 999, "node")), catalog: KnownHosts.mac))
         XCTAssertNil(HostChain.resolve(startPid: 5, table: table(p(100, 1, "node")), catalog: KnownHosts.mac))
