@@ -83,6 +83,13 @@ public class HostChainTests
     }
 
     [Fact]
+    public void AStopWordOnTheStartNodeIsNotAHost()
+    {
+        var table = Table(P(100, 1, "explorer", window: true));
+        Assert.Null(HostChain.Resolve(100, table, KnownHosts.Windows));
+    }
+
+    [Fact]
     public void MissingParentOrMissingStartStopsTheWalk()
     {
         Assert.Null(HostChain.Resolve(100, Table(P(100, 999, "claude")), KnownHosts.Windows));

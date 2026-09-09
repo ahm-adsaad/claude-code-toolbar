@@ -68,17 +68,10 @@ public partial class App
         // would leave the hovering user reading a line that has already been reset to idle.
         _widget.FlyoutHidden += AcknowledgeSessions;
         // Jump before anything else: acknowledging demotes needs-you to working, and a click on Clawd
-        // picks its target by state. FinishClick then puts the flyout away and acknowledges exactly once.
-        _widget.MascotClicked += () =>
-        {
-            JumpToSession(null);
-            FinishClick();
-        };
-        _widget.SessionClicked += id =>
-        {
-            JumpToSession(id);
-            FinishClick();
-        };
+        // picks its target by state. FinishClick then closes the flyout on a jump that landed — a jump
+        // that did not leaves its hint on screen — and acknowledges exactly once either way.
+        _widget.MascotClicked += () => FinishClick(JumpToSession(null));
+        _widget.SessionClicked += id => FinishClick(JumpToSession(id));
         _controller = new WidgetController(_widget, new TaskbarTracker(_widget), () => Settings);
         _theme = WidgetTheme.FromSettings(Settings.Appearance);
         RenderWidget(_monitor.State);

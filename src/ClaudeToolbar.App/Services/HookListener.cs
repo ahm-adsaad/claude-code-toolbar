@@ -15,8 +15,12 @@ public sealed class HookListener : IDisposable
     private TcpListener? _listener;
     private CancellationTokenSource? _cts;
 
-    /// <summary>Body of a POST /hook and the client's ephemeral port, raised on a thread-pool thread while the connection is open.</summary>
-    public event Action<string, int>? HookReceived;
+    /// <summary>
+    /// Body of a POST /hook, the client's ephemeral port and the port this connection arrived on,
+    /// raised on a thread-pool thread while the connection is open. The listening port travels with
+    /// the event because <see cref="Port"/> can already have moved on by the time it is handled.
+    /// </summary>
+    public event Action<string, int, int>? HookReceived;
 
     public int? Port { get; private set; }
     public string? Error { get; private set; }
@@ -33,7 +37,7 @@ public sealed class HookListener : IDisposable
             _cts = new CancellationTokenSource();
             Port = port;
             Error = null;
-            _ = AcceptLoopAsync(listener, _cts.Token);
+            _ = AcceptLoopAsync(listener, port, _cts.Token);
             Log.Info($"Hook listener on http://127.0.0.1:{port}/hook");
         }
         catch (SocketException ex)
@@ -58,7 +62,7 @@ public sealed class HookListener : IDisposable
 
     public void Dispose() => Stop();
 
-    private async Task AcceptLoopAsync(TcpListener listener, CancellationToken ct)
+    private async Task AcceptLoopAsync(TcpListener listener, int listenerPort, CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
         {
@@ -74,11 +78,11 @@ public sealed class HookListener : IDisposable
                 Log.Error("Hook listener accept failed", ex);
                 continue;
             }
-            _ = HandleAsync(client, ct);
+            _ = HandleAsync(client, listenerPort, ct);
         }
     }
 
-    private async Task HandleAsync(TcpClient client, CancellationToken ct)
+    private async Task HandleAsync(TcpClient client, int listenerPort, CancellationToken ct)
     {
         using (client)
         {
@@ -162,7 +166,7 @@ public sealed class HookListener : IDisposable
 
                 if (method == "POST" && path == "/hook")
                 {
-                    HookReceived?.Invoke(body, clientPort);
+                    HookReceived?.Invoke(body, clientPort, listenerPort);
                     await RespondAsync(stream, "200 OK", "");
                 }
                 else if (method == "GET" && path == "/health")

@@ -75,11 +75,10 @@ public partial class App
         if (_hooks is null)
         {
             _hooks = new HookListener();
-            var hooks = _hooks;
-            hooks.HookReceived += (body, clientPort) =>
+            _hooks.HookReceived += (body, clientPort, listenerPort) =>
             {
                 // On the listener's thread on purpose: the TCP-table and process walks must never run on the UI thread.
-                var host = hooks.Port is { } listenerPort ? _hostResolver.Resolve(clientPort, listenerPort) : null;
+                var host = _hostResolver.Resolve(clientPort, listenerPort);
                 Dispatcher.InvokeAsync(() => HandleHookBody(body, host));
             };
         }
@@ -160,6 +159,8 @@ public partial class App
             _lastPrune = DateTime.UtcNow;
             _sessions.Prune(DateTimeOffset.UtcNow);
             _badge = _sessions.Badge;
+            // A pruned session must not leave a tooltip summarising sessions that are no longer there.
+            if (_model is not null) Tray?.SetTooltip(BuildTooltip(_model));
         }
     }
 
@@ -179,20 +180,25 @@ public partial class App
 
     public string? JumpHint(DateTimeOffset now) => now < _jumpHintUntil ? _jumpHint : null;
 
-    /// <summary>Brings the session's host window forward: the given session, or the most urgent one when id is null.</summary>
-    public void JumpToSession(string? id)
+    /// <summary>
+    /// Brings the session's host window forward: the given session, or the most urgent one when id is null.
+    /// True when a window was raised or flashed, so the caller can keep the flyout up to explain a failure.
+    /// </summary>
+    public bool JumpToSession(string? id)
     {
         var session = id is null ? _sessions.JumpCandidate : _sessions.Session(id);
         if (session is null)
         {
             Log.Info("Jump: no session to go to");
-            return;
+            // A line the user clicked has gone since it was drawn; say so rather than doing nothing.
+            if (id is not null) ShowJumpHint("session ended");
+            return false;
         }
         if (session.Host is not { } host)
         {
             Log.Info($"Jump: {session.Name} has no known window");
             ShowJumpHint($"{session.Name}: window unknown");
-            return;
+            return false;
         }
         try
         {
@@ -201,7 +207,7 @@ public partial class App
             {
                 Log.Info($"Jump: {session.Name} → {host.Name} (pid {host.Pid}) has no window");
                 ShowJumpHint($"{session.Name}: window closed");
-                return;
+                return false;
             }
             var outcome = WindowActivator.Activate(hwnd);
             Log.Info($"Jump: {session.Name} → {host.Name}{outcome switch
@@ -210,10 +216,13 @@ public partial class App
                 WindowActivation.Flashed => " (foreground refused; taskbar button flashed)",
                 _ => " (window closed while jumping)",
             }}");
+            if (outcome == WindowActivation.Gone) ShowJumpHint($"{session.Name}: window closed");
+            return outcome is WindowActivation.Raised or WindowActivation.Flashed;
         }
         catch (Exception ex)
         {
             Log.Error("Jump failed", ex);
+            return false;
         }
     }
 
@@ -226,12 +235,12 @@ public partial class App
     }
 
     /// <summary>
-    /// Tidies up after a click that jumped. The flyout stays up while it is explaining why nothing
-    /// happened; otherwise it goes, silently — this is the one and only acknowledge on the click paths.
+    /// Tidies up after a click. A jump that landed puts the flyout away, silently; one that did not
+    /// leaves it up to explain why. This is the one and only acknowledge on the click paths.
     /// </summary>
-    private void FinishClick()
+    private void FinishClick(bool jumped)
     {
-        if (JumpHint(DateTimeOffset.UtcNow) is null) _widget?.CloseFlyout();
+        if (jumped) _widget?.CloseFlyout();
         AcknowledgeSessions();
     }
 
