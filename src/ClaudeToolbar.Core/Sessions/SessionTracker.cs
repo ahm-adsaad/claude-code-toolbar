@@ -6,7 +6,8 @@ public enum SessionState { Idle, Working, NeedsAttention, Finished, Failed }
 
 public enum SessionCue { Finished, Failed, Attention }
 
-public sealed record SessionInfo(string Id, string Name, SessionState State, DateTimeOffset UpdatedAt, string? Message, SessionHost? Host = null);
+/// <summary><paramref name="Agents"/> is how many background agents the last Stop left running; it is what keeps a session working after its turn ended.</summary>
+public sealed record SessionInfo(string Id, string Name, SessionState State, DateTimeOffset UpdatedAt, string? Message, SessionHost? Host = null, int Agents = 0);
 
 /// <summary>Per-session state driven by hook events. Not thread-safe: the host calls it on its UI thread.</summary>
 public sealed class SessionTracker
@@ -24,30 +25,39 @@ public sealed class SessionTracker
         var name = NameFor(e, existing);
         // The newest resolved host wins; an event without one keeps what was known.
         var known = host ?? existing?.Host;
+        // Background agents outlive prompts and notifications; only a Stop reports the current number.
+        var agents = existing?.Agents ?? 0;
         switch (e.Kind)
         {
             case SessionEventKind.Ended:
                 _sessions.Remove(e.SessionId);
                 return null;
             case SessionEventKind.Start:
-                Set(e.SessionId, name, existing?.State ?? SessionState.Idle, now, existing?.Message, known);
+                Set(e.SessionId, name, existing?.State ?? SessionState.Idle, now, existing?.Message, known, agents);
                 return null;
             case SessionEventKind.Info:
-                Set(e.SessionId, name, existing?.State ?? SessionState.Idle, now, existing?.Message, known);
+                Set(e.SessionId, name, existing?.State ?? SessionState.Idle, now, existing?.Message, known, agents);
                 return null;
             case SessionEventKind.PromptSubmitted:
-                Set(e.SessionId, name, SessionState.Working, now, null, known);
+                Set(e.SessionId, name, SessionState.Working, now, null, known, agents);
                 return null;
             case SessionEventKind.NeedsAttention:
                 var alreadyWaiting = existing?.State == SessionState.NeedsAttention;
-                Set(e.SessionId, name, SessionState.NeedsAttention, now, e.Message, known);
+                Set(e.SessionId, name, SessionState.NeedsAttention, now, e.Message, known, agents);
                 return alreadyWaiting ? null : SessionCue.Attention;
             case SessionEventKind.Stopped:
+                if (e.RunningAgents > 0)
+                {
+                    // The turn ended but agents it launched are still working: the session is not done and
+                    // nobody needs the user yet. The conclusion arrives with a later Stop that lists none.
+                    Set(e.SessionId, name, SessionState.Working, now, null, known, e.RunningAgents);
+                    return null;
+                }
                 var alreadyFinished = existing?.State == SessionState.Finished;
-                Set(e.SessionId, name, SessionState.Finished, now, null, known);
+                Set(e.SessionId, name, SessionState.Finished, now, null, known, 0);
                 return alreadyFinished ? null : SessionCue.Finished;
             case SessionEventKind.Failed:
-                Set(e.SessionId, name, SessionState.Failed, now, e.Detail, known);
+                Set(e.SessionId, name, SessionState.Failed, now, e.Detail, known, agents);
                 return SessionCue.Failed;
             default:
                 return null;
@@ -132,8 +142,8 @@ public sealed class SessionTracker
         parts.Add(all.Count == 1 ? $"{word} ({names})" : $"{group.Count} {word} ({names})");
     }
 
-    private void Set(string id, string name, SessionState state, DateTimeOffset now, string? message, SessionHost? host) =>
-        _sessions[id] = new SessionInfo(id, name, state, now, message, host);
+    private void Set(string id, string name, SessionState state, DateTimeOffset now, string? message, SessionHost? host, int agents) =>
+        _sessions[id] = new SessionInfo(id, name, state, now, message, host, agents);
 
     internal static string NameFor(SessionEvent e, SessionInfo? existing)
     {

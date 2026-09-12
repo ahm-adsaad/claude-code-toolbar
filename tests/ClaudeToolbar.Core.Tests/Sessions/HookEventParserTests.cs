@@ -23,10 +23,12 @@ public class HookEventParserTests
 
     [Theory]
     [InlineData("permission_prompt", SessionEventKind.NeedsAttention)]
-    [InlineData("idle_prompt", SessionEventKind.NeedsAttention)]
+    [InlineData("worker_permission_prompt", SessionEventKind.NeedsAttention)]
     [InlineData("agent_needs_input", SessionEventKind.NeedsAttention)]
     [InlineData("elicitation_dialog", SessionEventKind.NeedsAttention)]
     [InlineData("elicitation_url_dialog", SessionEventKind.NeedsAttention)]
+    // "Claude is waiting for your input", sent a minute after every turn ends: the finished cue already said so.
+    [InlineData("idle_prompt", SessionEventKind.Info)]
     [InlineData("auth_success", SessionEventKind.Info)]
     [InlineData("agent_completed", SessionEventKind.Info)]
     [InlineData("", SessionEventKind.Info)]
@@ -36,6 +38,32 @@ public class HookEventParserTests
         Assert.Equal(expected, e.Kind);
         Assert.Equal("Claude needs your permission", e.Message);
         Assert.Equal(type, e.Detail);
+    }
+
+    [Fact]
+    public void StopCountsTheAgentsStillRunningInTheBackground()
+    {
+        const string tasks = """
+            , "background_tasks": [
+                { "id": "a1", "type": "subagent", "status": "running", "description": "Implement task 8", "agent_type": "general-purpose" },
+                { "id": "a2", "type": "subagent", "status": "pending", "agent_type": "Explore" },
+                { "id": "a3", "type": "subagent", "status": "completed", "agent_type": "Explore" },
+                { "id": "a4", "type": "local_agent", "status": "running" },
+                { "id": "a5", "type": "remote_agent", "status": "killed" },
+                { "id": "sh", "type": "local_bash", "status": "running", "description": "npm run dev" },
+                { "id": "d", "type": "dream", "status": "running" },
+                "not an object",
+                { "type": "subagent" }
+            ], "session_crons": []
+            """;
+        var stopped = HookEventParser.Parse(Json("Stop", tasks))!;
+        Assert.Equal(SessionEventKind.Stopped, stopped.Kind);
+        Assert.Equal(3, stopped.RunningAgents);
+        Assert.Equal(0, HookEventParser.Parse(Json("Stop", ", \"background_tasks\": []"))!.RunningAgents);
+        Assert.Equal(0, HookEventParser.Parse(Json("Stop"))!.RunningAgents);
+        Assert.Equal(0, HookEventParser.Parse(Json("Stop", ", \"background_tasks\": \"nope\""))!.RunningAgents);
+        // Only Stop carries the count; every other event reports none.
+        Assert.Equal(0, HookEventParser.Parse(Json("UserPromptSubmit", tasks))!.RunningAgents);
     }
 
     [Fact]

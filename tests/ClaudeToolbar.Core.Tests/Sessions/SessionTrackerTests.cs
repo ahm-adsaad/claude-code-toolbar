@@ -7,8 +7,8 @@ public class SessionTrackerTests
 {
     private static readonly DateTimeOffset T0 = new(2026, 9, 7, 12, 0, 0, TimeSpan.Zero);
 
-    private static SessionEvent Ev(SessionEventKind kind, string id = "s1", string? cwd = "C:\\work\\my-repo", string? message = null, string? detail = null) =>
-        new(kind, id, cwd, message, detail);
+    private static SessionEvent Ev(SessionEventKind kind, string id = "s1", string? cwd = "C:\\work\\my-repo", string? message = null, string? detail = null, int agents = 0) =>
+        new(kind, id, cwd, message, detail, agents);
 
     [Fact]
     public void StartCreatesIdleSessionNamedAfterTheFolder()
@@ -44,6 +44,48 @@ public class SessionTrackerTests
         Assert.Equal(MascotBadge.Finished, t.Badge);
         Assert.Null(t.Apply(Ev(SessionEventKind.Stopped), T0.AddMinutes(2)));
         Assert.Equal("1 session · finished (my-repo)", t.Summary);
+    }
+
+    [Fact]
+    public void StopWithAgentsStillRunningKeepsWorkingUntilTheLastOneIsDone()
+    {
+        var t = new SessionTracker();
+        t.Apply(Ev(SessionEventKind.PromptSubmitted), T0);
+        // The turn ended but two background agents are still going: no cue, still working, and the line says so.
+        Assert.Null(t.Apply(Ev(SessionEventKind.Stopped, agents: 2), T0.AddMinutes(1)));
+        Assert.Equal((SessionState.Working, 2), (t.Sessions[0].State, t.Sessions[0].Agents));
+        Assert.Equal(MascotBadge.Working, t.Badge);
+        Assert.Equal("1 session · working (my-repo)", t.Summary);
+        Assert.Equal("my-repo · working · 2 agents · now", SessionLine.Text(t.Sessions[0], T0.AddMinutes(1)));
+        // An agent finished and the main agent picked up its result, then stopped again with one still running.
+        Assert.Null(t.Apply(Ev(SessionEventKind.Stopped, agents: 1), T0.AddMinutes(2)));
+        Assert.Equal("my-repo · working · 1 agent · now", SessionLine.Text(t.Sessions[0], T0.AddMinutes(2)));
+        // Events in between keep the count; a Stop with nobody left is the real finish.
+        t.Apply(Ev(SessionEventKind.Info), T0.AddMinutes(3));
+        Assert.Equal(1, t.Sessions[0].Agents);
+        Assert.Equal(SessionCue.Finished, t.Apply(Ev(SessionEventKind.Stopped), T0.AddMinutes(4)));
+        Assert.Equal((SessionState.Finished, 0), (t.Sessions[0].State, t.Sessions[0].Agents));
+    }
+
+    [Fact]
+    public void StopWithAgentsRunningDemotesAttentionAndSurvivesAcknowledge()
+    {
+        var t = new SessionTracker();
+        t.Apply(Ev(SessionEventKind.NeedsAttention, message: "permission"), T0);
+        Assert.Null(t.Apply(Ev(SessionEventKind.Stopped, agents: 1), T0.AddMinutes(1)));
+        Assert.Equal(SessionState.Working, t.Sessions[0].State);
+        Assert.Null(t.Sessions[0].Message);
+        t.Acknowledge();
+        Assert.Equal((SessionState.Working, 1), (t.Sessions[0].State, t.Sessions[0].Agents));
+        // A new prompt while the agent runs keeps the count until the next Stop reports it.
+        t.Apply(Ev(SessionEventKind.PromptSubmitted), T0.AddMinutes(2));
+        Assert.Equal(1, t.Sessions[0].Agents);
+        // A finished session that is acknowledged and then stops again with agents goes back to working.
+        t.Apply(Ev(SessionEventKind.Stopped), T0.AddMinutes(3));
+        t.Acknowledge();
+        Assert.Equal(SessionState.Idle, t.Sessions[0].State);
+        Assert.Null(t.Apply(Ev(SessionEventKind.Stopped, agents: 3), T0.AddMinutes(4)));
+        Assert.Equal((SessionState.Working, 3), (t.Sessions[0].State, t.Sessions[0].Agents));
     }
 
     [Fact]
@@ -182,5 +224,9 @@ public class SessionTrackerTests
         Assert.Equal("api · idle · now", SessionLine.Text(s with { State = SessionState.Idle, Host = null }, T0));
         Assert.Equal("api · failed · now", SessionLine.Text(s with { State = SessionState.Failed, Host = null }, T0));
         Assert.Equal("api · finished · now", SessionLine.Text(s with { State = SessionState.Finished, Host = null }, T0));
+        Assert.Equal("api · working · 2 agents · VS Code · now", SessionLine.Text(s with { State = SessionState.Working, Agents = 2 }, T0));
+        Assert.Equal("api · working · 1 agent · now", SessionLine.Text(s with { State = SessionState.Working, Host = null, Agents = 1 }, T0));
+        // The count only belongs to a working session; a finished line never mentions agents.
+        Assert.Equal("api · finished · now", SessionLine.Text(s with { State = SessionState.Finished, Host = null, Agents = 2 }, T0));
     }
 }

@@ -1,11 +1,12 @@
 namespace ClaudeToolbar.Core.Sessions;
 
-/// <summary>One flyout or popover line per session: "api · needs you · VS Code · 2 min".</summary>
+/// <summary>One flyout or popover line per session: "api · needs you · VS Code · 2 min", or "api · working · 2 agents · VS Code · now".</summary>
 public static class SessionLine
 {
     public static string Text(SessionInfo s, DateTimeOffset now)
     {
         var parts = new List<string> { s.Name, StateWord(s.State) };
+        if (s.State == SessionState.Working && s.Agents > 0) parts.Add(s.Agents == 1 ? "1 agent" : $"{s.Agents} agents");
         if (s.Host is { } host) parts.Add(host.Name);
         parts.Add(Age(now - s.UpdatedAt));
         return string.Join(" · ", parts);
