@@ -21,9 +21,10 @@ final class HookEventParserTests: XCTestCase {
 
     func testNotificationTypesMap() {
         let cases: [(String, SessionEventKind)] = [
-            ("permission_prompt", .needsAttention), ("idle_prompt", .needsAttention), ("agent_needs_input", .needsAttention),
+            ("permission_prompt", .needsAttention), ("worker_permission_prompt", .needsAttention), ("agent_needs_input", .needsAttention),
             ("elicitation_dialog", .needsAttention), ("elicitation_url_dialog", .needsAttention),
-            ("auth_success", .info), ("agent_completed", .info), ("", .info),
+            // "Claude is waiting for your input", sent a minute after every turn ends: the finished cue already said so.
+            ("idle_prompt", .info), ("auth_success", .info), ("agent_completed", .info), ("", .info),
         ]
         for (type, expected) in cases {
             let e = HookEventParser.parse(json("Notification", #", "notification_type": "\#(type)", "message": "Claude needs your permission""#))
@@ -32,6 +33,30 @@ final class HookEventParserTests: XCTestCase {
             XCTAssertEqual(e?.detail, type)
         }
         XCTAssertEqual(HookEventParser.parse(json("Notification", #", "message": "x""#))?.kind, .info)
+    }
+
+    func testStopCountsTheAgentsStillRunningInTheBackground() {
+        let tasks = #"""
+            , "background_tasks": [
+                { "id": "a1", "type": "subagent", "status": "running", "description": "Implement task 8", "agent_type": "general-purpose" },
+                { "id": "a2", "type": "subagent", "status": "pending", "agent_type": "Explore" },
+                { "id": "a3", "type": "subagent", "status": "completed", "agent_type": "Explore" },
+                { "id": "a4", "type": "local_agent", "status": "running" },
+                { "id": "a5", "type": "remote_agent", "status": "killed" },
+                { "id": "sh", "type": "local_bash", "status": "running", "description": "npm run dev" },
+                { "id": "d", "type": "dream", "status": "running" },
+                "not an object",
+                { "type": "subagent" }
+            ], "session_crons": []
+            """#
+        let stopped = HookEventParser.parse(json("Stop", tasks))
+        XCTAssertEqual(stopped?.kind, .stopped)
+        XCTAssertEqual(stopped?.runningAgents, 3)
+        XCTAssertEqual(HookEventParser.parse(json("Stop", #", "background_tasks": []"#))?.runningAgents, 0)
+        XCTAssertEqual(HookEventParser.parse(json("Stop"))?.runningAgents, 0)
+        XCTAssertEqual(HookEventParser.parse(json("Stop", #", "background_tasks": "nope""#))?.runningAgents, 0)
+        // Only Stop carries the count; every other event reports none.
+        XCTAssertEqual(HookEventParser.parse(json("UserPromptSubmit", tasks))?.runningAgents, 0)
     }
 
     func testRejectsUnknownAndMalformed() {

@@ -1,9 +1,10 @@
 import Foundation
 
-/// One popover line per session: "api · needs you · VS Code · 2 min".
+/// One popover line per session: "api · needs you · VS Code · 2 min", or "api · working · 2 agents · VS Code · now".
 public enum SessionLine {
     public static func text(_ s: SessionInfo, now: Date) -> String {
         var parts = [s.name, stateWord(s.state)]
+        if s.state == .working && s.agents > 0 { parts.append(s.agents == 1 ? "1 agent" : "\(s.agents) agents") }
         if let host = s.host { parts.append(host.name) }
         parts.append(age(now.timeIntervalSince(s.updatedAt)))
         return parts.joined(separator: " · ")

@@ -4,8 +4,8 @@ import XCTest
 final class SessionTrackerTests: XCTestCase {
     private let t0 = Date(timeIntervalSince1970: 1_788_782_400)
 
-    private func ev(_ kind: SessionEventKind, id: String = "s1", cwd: String? = "/work/my-repo", message: String? = nil, detail: String? = nil) -> SessionEvent {
-        SessionEvent(kind: kind, sessionId: id, cwd: cwd, message: message, detail: detail)
+    private func ev(_ kind: SessionEventKind, id: String = "s1", cwd: String? = "/work/my-repo", message: String? = nil, detail: String? = nil, agents: Int = 0) -> SessionEvent {
+        SessionEvent(kind: kind, sessionId: id, cwd: cwd, message: message, detail: detail, runningAgents: agents)
     }
 
     func testStartCreatesIdleSessionNamedAfterTheFolder() {
@@ -36,6 +36,48 @@ final class SessionTrackerTests: XCTestCase {
         XCTAssertEqual(t.badge, .finished)
         XCTAssertNil(t.apply(ev(.stopped), now: t0.addingTimeInterval(120)))
         XCTAssertEqual(t.summary, "1 session · finished (my-repo)")
+    }
+
+    func testStopWithAgentsStillRunningKeepsWorkingUntilTheLastOneIsDone() {
+        let t = SessionTracker()
+        _ = t.apply(ev(.promptSubmitted), now: t0)
+        // The turn ended but two background agents are still going: no cue, still working, and the line says so.
+        XCTAssertNil(t.apply(ev(.stopped, agents: 2), now: t0.addingTimeInterval(60)))
+        XCTAssertEqual(t.sessions[0].state, .working)
+        XCTAssertEqual(t.sessions[0].agents, 2)
+        XCTAssertEqual(t.badge, .working)
+        XCTAssertEqual(t.summary, "1 session · working (my-repo)")
+        XCTAssertEqual(SessionLine.text(t.sessions[0], now: t0.addingTimeInterval(60)), "my-repo · working · 2 agents · now")
+        // An agent finished and the main agent picked up its result, then stopped again with one still running.
+        XCTAssertNil(t.apply(ev(.stopped, agents: 1), now: t0.addingTimeInterval(120)))
+        XCTAssertEqual(SessionLine.text(t.sessions[0], now: t0.addingTimeInterval(120)), "my-repo · working · 1 agent · now")
+        // Events in between keep the count; a Stop with nobody left is the real finish.
+        _ = t.apply(ev(.info), now: t0.addingTimeInterval(180))
+        XCTAssertEqual(t.sessions[0].agents, 1)
+        XCTAssertEqual(t.apply(ev(.stopped), now: t0.addingTimeInterval(240)), .finished)
+        XCTAssertEqual(t.sessions[0].state, .finished)
+        XCTAssertEqual(t.sessions[0].agents, 0)
+    }
+
+    func testStopWithAgentsRunningDemotesAttentionAndSurvivesAcknowledge() {
+        let t = SessionTracker()
+        _ = t.apply(ev(.needsAttention, message: "permission"), now: t0)
+        XCTAssertNil(t.apply(ev(.stopped, agents: 1), now: t0.addingTimeInterval(60)))
+        XCTAssertEqual(t.sessions[0].state, .working)
+        XCTAssertNil(t.sessions[0].message)
+        t.acknowledge()
+        XCTAssertEqual(t.sessions[0].state, .working)
+        XCTAssertEqual(t.sessions[0].agents, 1)
+        // A new prompt while the agent runs keeps the count until the next Stop reports it.
+        _ = t.apply(ev(.promptSubmitted), now: t0.addingTimeInterval(120))
+        XCTAssertEqual(t.sessions[0].agents, 1)
+        // A finished session that is acknowledged and then stops again with agents goes back to working.
+        _ = t.apply(ev(.stopped), now: t0.addingTimeInterval(180))
+        t.acknowledge()
+        XCTAssertEqual(t.sessions[0].state, .idle)
+        XCTAssertNil(t.apply(ev(.stopped, agents: 3), now: t0.addingTimeInterval(240)))
+        XCTAssertEqual(t.sessions[0].state, .working)
+        XCTAssertEqual(t.sessions[0].agents, 3)
     }
 
     func testAttentionCuesOnceUntilTheStateChanges() {
@@ -153,5 +195,10 @@ final class SessionTrackerTests: XCTestCase {
         XCTAssertEqual(SessionLine.stateWord(.idle), "idle")
         XCTAssertEqual(SessionLine.stateWord(.failed), "failed")
         XCTAssertEqual(SessionLine.stateWord(.finished), "finished")
+        let busy = SessionInfo(id: "s1", name: "api", state: .working, updatedAt: t0, message: nil, host: host, agents: 2)
+        XCTAssertEqual(SessionLine.text(busy, now: t0), "api · working · 2 agents · VS Code · now")
+        XCTAssertEqual(SessionLine.text(SessionInfo(id: "s1", name: "api", state: .working, updatedAt: t0, message: nil, host: nil, agents: 1), now: t0), "api · working · 1 agent · now")
+        // The count only belongs to a working session; a finished line never mentions agents.
+        XCTAssertEqual(SessionLine.text(SessionInfo(id: "s1", name: "api", state: .finished, updatedAt: t0, message: nil, host: nil, agents: 2), now: t0), "api · finished · now")
     }
 }

@@ -12,6 +12,18 @@ public struct SessionInfo: Equatable, Sendable {
     public let message: String?
     /// The window-owning process that hosts this session, once a hook has been traced to it.
     public let host: SessionHost?
+    /// How many background agents the last Stop left running; it is what keeps a session working after its turn ended.
+    public let agents: Int
+
+    public init(id: String, name: String, state: SessionState, updatedAt: Date, message: String?, host: SessionHost?, agents: Int = 0) {
+        self.id = id
+        self.name = name
+        self.state = state
+        self.updatedAt = updatedAt
+        self.message = message
+        self.host = host
+        self.agents = agents
+    }
 }
 
 /// Per-session state driven by hook events. Not thread-safe: the host calls it on the main actor.
@@ -32,26 +44,34 @@ public final class SessionTracker {
         let name = Self.name(for: e, existing: existing)
         // The newest resolved host wins; an event without one keeps what was known.
         let known = host ?? existing?.host
+        // Background agents outlive prompts and notifications; only a Stop reports the current number.
+        let agents = existing?.agents ?? 0
         switch e.kind {
         case .ended:
             sessions_.removeValue(forKey: e.sessionId)
             return nil
         case .start, .info:
-            set(e.sessionId, name, existing?.state ?? .idle, now, existing?.message, known)
+            set(e.sessionId, name, existing?.state ?? .idle, now, existing?.message, known, agents)
             return nil
         case .promptSubmitted:
-            set(e.sessionId, name, .working, now, nil, known)
+            set(e.sessionId, name, .working, now, nil, known, agents)
             return nil
         case .needsAttention:
             let alreadyWaiting = existing?.state == .needsAttention
-            set(e.sessionId, name, .needsAttention, now, e.message, known)
+            set(e.sessionId, name, .needsAttention, now, e.message, known, agents)
             return alreadyWaiting ? nil : .attention
         case .stopped:
+            if e.runningAgents > 0 {
+                // The turn ended but agents it launched are still working: the session is not done and
+                // nobody needs the user yet. The conclusion arrives with a later Stop that lists none.
+                set(e.sessionId, name, .working, now, nil, known, e.runningAgents)
+                return nil
+            }
             let alreadyFinished = existing?.state == .finished
-            set(e.sessionId, name, .finished, now, nil, known)
+            set(e.sessionId, name, .finished, now, nil, known, 0)
             return alreadyFinished ? nil : .finished
         case .failed:
-            set(e.sessionId, name, .failed, now, e.detail, known)
+            set(e.sessionId, name, .failed, now, e.detail, known, agents)
             return .failed
         }
     }
@@ -91,7 +111,7 @@ public final class SessionTracker {
             default: state = s.state
             }
             if state != s.state || s.message != nil {
-                sessions_[id] = SessionInfo(id: s.id, name: s.name, state: state, updatedAt: s.updatedAt, message: nil, host: s.host)
+                sessions_[id] = SessionInfo(id: s.id, name: s.name, state: state, updatedAt: s.updatedAt, message: nil, host: s.host, agents: s.agents)
             }
         }
     }
@@ -132,8 +152,8 @@ public final class SessionTracker {
         parts.append(all.count == 1 ? "\(word) (\(names))" : "\(group.count) \(word) (\(names))")
     }
 
-    private func set(_ id: String, _ name: String, _ state: SessionState, _ now: Date, _ message: String?, _ host: SessionHost?) {
-        sessions_[id] = SessionInfo(id: id, name: name, state: state, updatedAt: now, message: message, host: host)
+    private func set(_ id: String, _ name: String, _ state: SessionState, _ now: Date, _ message: String?, _ host: SessionHost?, _ agents: Int) {
+        sessions_[id] = SessionInfo(id: id, name: name, state: state, updatedAt: now, message: message, host: host, agents: agents)
     }
 
     static func name(for e: SessionEvent, existing: SessionInfo?) -> String {
