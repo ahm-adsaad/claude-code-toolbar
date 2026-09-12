@@ -81,6 +81,20 @@ public static class ProcessTable
         return parents;
     }
 
+    /// <summary>Lower-case executable base name, the form the host catalog uses; null when the process is gone.</summary>
+    public static string? Name(int pid)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(pid);
+            return process.ProcessName.ToLowerInvariant();
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            return null;
+        }
+    }
+
     public static DateTimeOffset StartTime(int pid)
     {
         try

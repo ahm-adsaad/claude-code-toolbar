@@ -122,7 +122,7 @@ public partial class App
             var e = HookEventParser.Parse(body);
             if (e is null) return;
             var cue = _sessions.Apply(e, DateTimeOffset.UtcNow, host);
-            Log.Info($"Session {e.SessionId[..Math.Min(8, e.SessionId.Length)]} ({_sessions.Sessions.FirstOrDefault(s => s.Id == e.SessionId)?.Name}): {e.Kind}{(cue is null ? "" : " → " + cue)}");
+            Log.Info($"Session {e.SessionId[..Math.Min(8, e.SessionId.Length)]} ({_sessions.Sessions.FirstOrDefault(s => s.Id == e.SessionId)?.Name}): {e.Kind}{(e.RunningAgents switch { 0 => "", 1 => " (1 agent still running)", var n => $" ({n} agents still running)" })}{(cue is null ? "" : " → " + cue)}");
             if (cue is { } c) React(c);
             RefreshSessionUi();
         }
@@ -202,15 +202,30 @@ public partial class App
         }
         try
         {
-            var hwnd = WindowLocator.Find(host, session.Name);
+            // The console of the Claude Code process says which window shows it and under which tab title;
+            // read now, not at hook time, because Claude Code retitles the tab as the conversation moves on.
+            var console = host.ClientPid > 0 && ProcessTable.StartTime(host.ClientPid) == host.ClientStart
+                ? ConsoleProbe.Read(host.ClientPid)
+                : null;
+            var hwnd = console is not null && ProcessTable.IsCandidateWindow(console.Window)
+                ? console.Window
+                : WindowLocator.Find(host, session.Name);
             if (hwnd == IntPtr.Zero)
             {
                 Log.Info($"Jump: {session.Name} → {host.Name} (pid {host.Pid}) has no window");
                 ShowJumpHint($"{session.Name}: window closed");
                 return false;
             }
+            // The tab first, so that a window Windows refuses to raise at least shows the right tab once the user gets there.
+            var tab = console is null ? TabSwitch.NoTabs : TerminalTabs.Select(hwnd, console.Title);
             var outcome = WindowActivator.Activate(hwnd);
-            Log.Info($"Jump: {session.Name} → {host.Name}{outcome switch
+            Log.Info($"Jump: {session.Name} → {host.Name}{tab switch
+            {
+                TabSwitch.Switched => $", tab '{console!.Title}'",
+                TabSwitch.AlreadyCurrent => $", tab '{console!.Title}' already in front",
+                TabSwitch.NotFound => $", no tab titled '{console!.Title}'",
+                _ => string.Empty,
+            }}{outcome switch
             {
                 WindowActivation.Raised => string.Empty,
                 WindowActivation.Flashed => " (foreground refused; taskbar button flashed)",

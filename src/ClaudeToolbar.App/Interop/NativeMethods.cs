@@ -54,6 +54,7 @@ internal static class NativeMethods
     public const int OBJID_WINDOW = 0;
 
     public const uint GW_HWNDNEXT = 2;
+    public const uint GA_ROOTOWNER = 3;
     public const uint MONITOR_DEFAULTTONEAREST = 2;
 
     public const int QUNS_BUSY = 2;
@@ -171,4 +172,27 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool FlashWindowEx(ref FLASHWINFO pwfi);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetAncestor(IntPtr hwnd, uint gaFlags);
+
+    public delegate bool HandlerRoutine(uint dwCtrlType);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool AttachConsole(uint dwProcessId);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool FreeConsole();
+
+    [DllImport("kernel32.dll")]
+    public static extern IntPtr GetConsoleWindow();
+
+    [DllImport("kernel32.dll", EntryPoint = "GetConsoleTitleW", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern uint GetConsoleTitle(StringBuilder lpConsoleTitle, uint nSize);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool SetConsoleCtrlHandler(HandlerRoutine? handlerRoutine, [MarshalAs(UnmanagedType.Bool)] bool add);
 }

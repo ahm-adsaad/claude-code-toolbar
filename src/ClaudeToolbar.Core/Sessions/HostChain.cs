@@ -1,7 +1,12 @@
 namespace ClaudeToolbar.Core.Sessions;
 
-/// <summary>The window-owning process that hosts a Claude Code session: a terminal, an editor or the desktop app.</summary>
-public sealed record SessionHost(int Pid, string Name, DateTimeOffset ResolvedAt);
+/// <summary>
+/// The window-owning process that hosts a Claude Code session: a terminal, an editor or the desktop app.
+/// <paramref name="ClientPid"/> is the Claude Code process the hooks come from, with its start time so a
+/// reused pid is not mistaken for it; the Windows app reads that process's console at click time to find
+/// the terminal tab. Zero when unknown.
+/// </summary>
+public sealed record SessionHost(int Pid, string Name, DateTimeOffset ResolvedAt, int ClientPid = 0, DateTimeOffset ClientStart = default);
 
 /// <summary>One process as the platform reports it: enough to walk parents and tell hosts apart.</summary>
 public sealed record ProcessRecord(int Pid, int ParentPid, string Name, DateTimeOffset StartTime, bool HasWindow);
