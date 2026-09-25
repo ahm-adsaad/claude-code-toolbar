@@ -33,6 +33,7 @@ public enum TrackedRows {
             case "7d": window = snapshot?.sevenDay
             case "7d Opus": window = snapshot?.sevenDayOpus
             case "7d Sonnet": window = snapshot?.sevenDaySonnet
+            case "7d Fable": window = snapshot?.sevenDayFable
             default: window = nil
             }
             return TrackedRow(key: row.label, level: row.level, resetsAt: window?.resetsAt)

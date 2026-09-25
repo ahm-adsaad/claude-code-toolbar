@@ -23,6 +23,7 @@ enum SampleData {
             sevenDay: UsageWindow(utilization: 18, resetsAt: now.addingTimeInterval(3 * 86_400 + 4 * 3600)),
             sevenDayOpus: UsageWindow(utilization: 75, resetsAt: now.addingTimeInterval(3 * 86_400 + 4 * 3600)),
             sevenDaySonnet: UsageWindow(utilization: 96, resetsAt: now.addingTimeInterval(86_400 + 2 * 3600)),
+            sevenDayFable: UsageWindow(utilization: 8, resetsAt: now.addingTimeInterval(3 * 86_400 + 4 * 3600)),
             fetchedAt: now.addingTimeInterval(-12))
     }
 

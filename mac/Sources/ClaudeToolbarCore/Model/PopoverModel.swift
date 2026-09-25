@@ -51,6 +51,7 @@ public enum PopoverModelBuilder {
             add("Weekly", s.sevenDay)
             add("Weekly Opus", s.sevenDayOpus)
             add("Weekly Sonnet", s.sevenDaySonnet)
+            add("Weekly Fable", s.sevenDayFable)
         }
 
         let updated = state.lastSuccess.map { "Updated \(AgoFormatter.format(ago: now.timeIntervalSince($0))) ago" }

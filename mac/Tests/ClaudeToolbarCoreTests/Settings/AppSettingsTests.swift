@@ -54,4 +54,9 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertThrowsError(try SettingsJSON.decode(#"{ "behavior": { "refreshIntervalSeconds": "fast" } }"#))
         XCTAssertThrowsError(try SettingsJSON.decode("[]"))
     }
+
+    func testFableRowIsOffByDefaultAndDecodes() throws {
+        XCTAssertFalse(AppSettings.createDefault().rows.showSevenDayFable)
+        XCTAssertTrue(try SettingsJSON.decode(#"{ "rows": { "showSevenDayFable": true } }"#).rows.showSevenDayFable)
+    }
 }

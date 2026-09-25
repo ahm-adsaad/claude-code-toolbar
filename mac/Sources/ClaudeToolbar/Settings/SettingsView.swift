@@ -8,7 +8,12 @@ struct PreviewStrip: View {
     var body: some View {
         HStack {
             Spacer()
+            // Scaled down rather than drawn at full size: with several rows the menu bar item is wider
+            // than the fixed-width window, and a full-size image pushes the whole form past its edge.
             Image(nsImage: image)
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: image.size.width, maxHeight: image.size.height)
             Spacer()
         }
         .padding(8)
@@ -37,6 +42,7 @@ struct SettingsView: View {
                 Toggle("7-day weekly", isOn: $model.settings.rows.showSevenDay)
                 Toggle("7-day Opus", isOn: $model.settings.rows.showSevenDayOpus)
                 Toggle("7-day Sonnet", isOn: $model.settings.rows.showSevenDaySonnet)
+                Toggle("7-day Fable", isOn: $model.settings.rows.showSevenDayFable)
                 Toggle("Label", isOn: $model.settings.rows.showLabel)
                 Toggle("Bar", isOn: $model.settings.rows.showBar)
                 Toggle("Percent", isOn: $model.settings.rows.showPercent)

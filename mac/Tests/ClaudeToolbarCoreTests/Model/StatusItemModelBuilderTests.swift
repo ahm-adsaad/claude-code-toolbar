@@ -92,4 +92,15 @@ final class StatusItemModelBuilderTests: XCTestCase {
         let m = StatusItemModelBuilder.build(state: state(.ok, snapshot: snapshot), settings: s, now: now)
         XCTAssertEqual(m.rows[0].level, .warn)
     }
+
+    func testFableRowFollowsSonnet() {
+        var s = AppSettings.createDefault()
+        s.rows.showSevenDayFable = true
+        let snap = UsageSnapshot(fiveHour: nil, sevenDay: nil, sevenDayOpus: nil, sevenDaySonnet: nil,
+                                 sevenDayFable: UsageWindow(utilization: 8, resetsAt: nil), fetchedAt: now)
+        let m = StatusItemModelBuilder.build(state: state(.ok, snapshot: snap), settings: s, now: now)
+        XCTAssertEqual(m.rows.map(\.label), ["5h", "7d", "7d Fable"])
+        XCTAssertEqual(m.rows[2].percentText, "8%")
+        XCTAssertTrue(m.rows[2].hasData)
+    }
 }

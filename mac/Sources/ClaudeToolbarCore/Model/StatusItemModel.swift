@@ -72,6 +72,7 @@ public enum StatusItemModelBuilder {
         add(r.showSevenDay, "7d", state.snapshot?.sevenDay)
         add(r.showSevenDayOpus, "7d Opus", state.snapshot?.sevenDayOpus)
         add(r.showSevenDaySonnet, "7d Sonnet", state.snapshot?.sevenDaySonnet)
+        add(r.showSevenDayFable, "7d Fable", state.snapshot?.sevenDayFable)
 
         let expired = state.status == .expired
         return StatusItemModel(

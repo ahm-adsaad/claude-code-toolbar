@@ -21,6 +21,7 @@ public enum UsageResponseParser {
             sevenDay: readWindow(root, "seven_day"),
             sevenDayOpus: readWindow(root, "seven_day_opus"),
             sevenDaySonnet: readWindow(root, "seven_day_sonnet"),
+            sevenDayFable: readWindow(root, "seven_day_fable") ?? readScopedWeekly(root, model: "Fable"),
             fetchedAt: fetchedAt))
     }
 
@@ -32,5 +33,21 @@ public enum UsageResponseParser {
             resetsAt = ISO8601.parse(text)
         }
         return UsageWindow(utilization: min(max(raw, 0), 100), resetsAt: resetsAt)
+    }
+
+    /// Newer models have no `seven_day_<model>` field: their weekly limit is a `weekly_scoped` entry in `limits`,
+    /// named by `scope.model.display_name`.
+    private static func readScopedWeekly(_ root: [String: Any], model: String) -> UsageWindow? {
+        guard let limits = root["limits"] as? [[String: Any]] else { return nil }
+        for limit in limits where limit["kind"] as? String == "weekly_scoped" {
+            let scope = limit["scope"] as? [String: Any]
+            let scopeModel = scope?["model"] as? [String: Any]
+            guard let name = scopeModel?["display_name"] as? String,
+                  name.caseInsensitiveCompare(model) == .orderedSame,
+                  let raw = JSONNumber.double(limit["percent"]) else { continue }
+            let resetsAt = (limit["resets_at"] as? String).flatMap(ISO8601.parse)
+            return UsageWindow(utilization: min(max(raw, 0), 100), resetsAt: resetsAt)
+        }
+        return nil
     }
 }

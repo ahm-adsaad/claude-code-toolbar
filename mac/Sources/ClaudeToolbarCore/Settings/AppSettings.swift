@@ -30,6 +30,7 @@ public struct RowSettings: Codable, Equatable, Sendable {
     public var showSevenDay = true
     public var showSevenDayOpus = false
     public var showSevenDaySonnet = false
+    public var showSevenDayFable = false
     public var showLabel = true
     public var showBar = true
     public var showPercent = true
@@ -39,7 +40,7 @@ public struct RowSettings: Codable, Equatable, Sendable {
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case showFiveHour, showSevenDay, showSevenDayOpus, showSevenDaySonnet
+        case showFiveHour, showSevenDay, showSevenDayOpus, showSevenDaySonnet, showSevenDayFable
         case showLabel, showBar, showPercent, showTime, barWidth
     }
 
@@ -49,6 +50,7 @@ public struct RowSettings: Codable, Equatable, Sendable {
         showSevenDay = try c.decodeIfPresent(Bool.self, forKey: .showSevenDay) ?? showSevenDay
         showSevenDayOpus = try c.decodeIfPresent(Bool.self, forKey: .showSevenDayOpus) ?? showSevenDayOpus
         showSevenDaySonnet = try c.decodeIfPresent(Bool.self, forKey: .showSevenDaySonnet) ?? showSevenDaySonnet
+        showSevenDayFable = try c.decodeIfPresent(Bool.self, forKey: .showSevenDayFable) ?? showSevenDayFable
         showLabel = try c.decodeIfPresent(Bool.self, forKey: .showLabel) ?? showLabel
         showBar = try c.decodeIfPresent(Bool.self, forKey: .showBar) ?? showBar
         showPercent = try c.decodeIfPresent(Bool.self, forKey: .showPercent) ?? showPercent

@@ -72,4 +72,29 @@ final class UsageResponseParserTests: XCTestCase {
         guard case .failed(let message) = UsageResponseParser.parse("[1, 2]", fetchedAt: fetchedAt) else { return XCTFail("array should fail") }
         XCTAssertEqual(message, "Response is not a JSON object")
     }
+
+    func testFableComesFromScopedWeeklyLimit() {
+        let json = """
+        {
+          "seven_day": { "utilization": 27.0, "resets_at": "2026-09-10T16:00:00+00:00" },
+          "limits": [
+            { "kind": "weekly_all", "percent": 27, "resets_at": "2026-09-10T16:00:00+00:00", "scope": null },
+            { "kind": "weekly_scoped", "percent": 8, "resets_at": "2026-09-10T16:00:00Z",
+              "scope": { "model": { "id": null, "display_name": "Fable" }, "surface": null } }
+          ]
+        }
+        """
+        guard let s = ok(UsageResponseParser.parse(json, fetchedAt: fetchedAt)) else { return }
+        XCTAssertEqual(s.sevenDayFable?.utilization, 8)
+        XCTAssertEqual(s.sevenDayFable?.resetsAt, Date(timeIntervalSince1970: 1_789_056_000))
+        XCTAssertEqual(s.sevenDay?.utilization, 27)
+    }
+
+    func testFablePrefersItsOwnFieldAndIsNilWhenAbsent() {
+        let own = #"{ "seven_day_fable": { "utilization": 12 }, "limits": [ { "kind": "weekly_scoped", "percent": 8, "scope": { "model": { "display_name": "Fable" } } } ] }"#
+        XCTAssertEqual(ok(UsageResponseParser.parse(own, fetchedAt: fetchedAt))?.sevenDayFable?.utilization, 12)
+        let other = #"{ "limits": [ { "kind": "weekly_scoped", "percent": 8, "scope": { "model": { "display_name": "Opus" } } }, { "kind": "session", "percent": 50 } ] }"#
+        XCTAssertNil(ok(UsageResponseParser.parse(other, fetchedAt: fetchedAt))?.sevenDayFable)
+        XCTAssertNil(ok(UsageResponseParser.parse(fullPayload, fetchedAt: fetchedAt))?.sevenDayFable)
+    }
 }
