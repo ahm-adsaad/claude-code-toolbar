@@ -17,7 +17,7 @@ Claude Toolbar has no login of its own. It reads the credentials Claude Code sav
 
 The rows, thresholds and refresh interval are the same on both platforms:
 
-- Rows: the 5-hour session window and the 7-day weekly window, plus optional rows for the per-model weekly limits (Opus, Sonnet) on plans that report them.
+- Rows: the 5-hour session window and the 7-day weekly window, plus optional rows for the per-model weekly limits (Opus, Sonnet, and on macOS Fable) on plans that report them.
 - Bars change colour from OK to warning to critical at thresholds you choose (defaults 70 % and 90 %).
 - Refresh every 30 to 300 seconds (default 60), with an immediate refresh after sleep, when the network comes back, and when a window resets.
 
