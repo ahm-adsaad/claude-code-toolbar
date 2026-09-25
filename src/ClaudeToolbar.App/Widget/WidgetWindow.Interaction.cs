@@ -88,8 +88,10 @@ public partial class WidgetWindow
 
     public void ShowFlyout(FlyoutModel model, IReadOnlyList<SessionLineItem> sessions, string? hint, WidgetTheme theme)
     {
-        // A hide that is already pending would close what we are about to show.
-        _hideTimer.Stop();
+        // A hide that is already pending would close what we are about to show. A refresh of a flyout
+        // that is already up must leave it alone: the mouse may have left already, and no second
+        // MouseLeave will come to start it again.
+        if (!_flyout.IsOpen) _hideTimer.Stop();
         _flyoutBorder.Background = theme.Background;
         _flyoutBorder.BorderBrush = theme.BarTrack;
         _flyoutPanel.Children.Clear();
