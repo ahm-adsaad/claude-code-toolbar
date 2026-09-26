@@ -13,7 +13,9 @@ public sealed class TaskbarTracker : IDisposable
     private readonly WidgetWindow _window;
     private readonly DispatcherTimer _timer = new(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
     private readonly uint _taskbarCreatedMsg = RegisterWindowMessage("TaskbarCreated");
+    private readonly DispatcherTimer _foregroundSettle = new() { Interval = TimeSpan.FromMilliseconds(150) };
     private WinEventHook? _hook;
+    private WinEventHook? _foregroundHook;
     private DateTime _lastLocateAttempt = DateTime.MinValue;
     private bool _evaluateQueued;
 
@@ -26,19 +28,35 @@ public sealed class TaskbarTracker : IDisposable
             Evaluate(force: false);
             Sanity?.Invoke();
         };
+        _foregroundSettle.Tick += (_, _) =>
+        {
+            _foregroundSettle.Stop();
+            Sanity?.Invoke();
+        };
     }
 
     public TaskbarLayout? Layout { get; private set; }
 
     public event Action? Changed;
 
-    /// <summary>Raised once per second regardless of whether the layout changed; the controller re-checks fullscreen and z-order on it.</summary>
+    /// <summary>Raised once per second, and on every foreground-window change, regardless of whether the layout changed; the controller re-checks fullscreen and z-order on it.</summary>
     public event Action? Sanity;
 
     public void Start()
     {
         Relocate();
+        // A closing shell flyout (Quick Settings, Start, calendar) drops the taskbar back on top of us without moving it,
+        // so the location hook stays silent. The foreground change that accompanies the close is our cue to re-check.
+        _foregroundHook ??= new WinEventHook(EVENT_SYSTEM_FOREGROUND, 0, _ => true, OnForegroundChanged);
         _timer.Start();
+    }
+
+    private void OnForegroundChanged()
+    {
+        _window.Dispatcher.InvokeAsync(() => Sanity?.Invoke());
+        // The shell can finish reordering after the foreground switch; look once more shortly after.
+        _foregroundSettle.Stop();
+        _foregroundSettle.Start();
     }
 
     private void OnShellMessage(int msg)
@@ -58,7 +76,7 @@ public sealed class TaskbarTracker : IDisposable
         {
             var tray = l.TrayHwnd;
             var notify = l.NotifyHwnd;
-            _hook = new WinEventHook(l.ExplorerPid, h => h == tray || h == notify, () => QueueEvaluate(relocate: false));
+            _hook = new WinEventHook(EVENT_OBJECT_LOCATIONCHANGE, l.ExplorerPid, h => h == tray || h == notify, () => QueueEvaluate(relocate: false));
             Log.Info($"Taskbar located: now={l.TaskbarNow} notify={l.Notify} autohide={l.AutoHide}");
         }
         else
@@ -105,7 +123,9 @@ public sealed class TaskbarTracker : IDisposable
     public void Dispose()
     {
         _timer.Stop();
+        _foregroundSettle.Stop();
         _window.ShellMessage -= OnShellMessage;
         _hook?.Dispose();
+        _foregroundHook?.Dispose();
     }
 }
