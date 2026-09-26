@@ -36,6 +36,8 @@ public partial class App
     private bool _greeted;
     private MascotBadge _badge = MascotBadge.None;
     private bool _badgeLit = true;
+    private bool _locked;
+    private bool _displayOff;
 
     public event Action<MonitorState>? MonitorStateChanged;
 
@@ -72,6 +74,11 @@ public partial class App
         // that did not leaves its hint on screen — and acknowledges exactly once either way.
         _widget.MascotClicked += () => FinishClick(JumpToSession(null));
         _widget.SessionClicked += id => FinishClick(JumpToSession(id));
+        _widget.DisplayStateChanged += on =>
+        {
+            _displayOff = !on;
+            UpdatePaused();
+        };
         _controller = new WidgetController(_widget, new TaskbarTracker(_widget), () => Settings);
         _theme = WidgetTheme.FromSettings(Settings.Appearance);
         RenderWidget(_monitor.State);
@@ -79,6 +86,7 @@ public partial class App
 
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
+        SystemEvents.SessionSwitch += OnSessionSwitch;
         NetworkChange.NetworkAvailabilityChanged += OnNetworkAvailabilityChanged;
 
         _tick = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
@@ -168,6 +176,7 @@ public partial class App
     {
         if (_monitor is null || _widget is null) return;
 
+        _controller?.Tick();
         if (_monitor.State.Status == UsageStatus.NoCredentials && DateTime.UtcNow - _lastNoCredentialsRetry > NoCredentialsRetry)
         {
             _lastNoCredentialsRetry = DateTime.UtcNow;
@@ -243,6 +252,39 @@ public partial class App
         });
     }
 
+    private void OnSessionSwitch(object sender, SessionSwitchEventArgs e)
+    {
+        if (e.Reason is not (SessionSwitchReason.SessionLock or SessionSwitchReason.SessionUnlock)) return;
+        Dispatcher.InvokeAsync(() =>
+        {
+            _locked = e.Reason == SessionSwitchReason.SessionLock;
+            UpdatePaused();
+        });
+    }
+
+    /// <summary>
+    /// While the PC is locked or the display is off nobody can see the widget, so the once-a-second tick — and with
+    /// it the usage polling and taskbar checks — stops. Hook events still arrive and still chime. Coming back
+    /// catches up at once: fresh usage, a fresh taskbar lookup (the display may have changed meanwhile) and a tick.
+    /// </summary>
+    private void UpdatePaused()
+    {
+        if (_tick is null) return;
+        var pause = _locked || _displayOff;
+        if (pause == !_tick.IsEnabled) return;
+        if (pause)
+        {
+            Log.Info($"Pausing updates ({(_locked ? "locked" : "display off")})");
+            _tick.Stop();
+            return;
+        }
+        Log.Info("Resuming updates");
+        _monitor?.RequestRefresh();
+        _controller?.Relocate();
+        _tick.Start();
+        Tick();
+    }
+
     private void OnDisplaySettingsChanged(object? sender, EventArgs e) =>
         Dispatcher.InvokeAsync(() => _controller?.Relocate());
 
@@ -263,6 +305,7 @@ public partial class App
         StopNotifications();
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
+        SystemEvents.SessionSwitch -= OnSessionSwitch;
         NetworkChange.NetworkAvailabilityChanged -= OnNetworkAvailabilityChanged;
         _credentialsWatcher?.Dispose();
         _controller?.Dispose();

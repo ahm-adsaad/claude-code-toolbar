@@ -58,7 +58,7 @@ It reads `%USERPROFILE%\.claude\.credentials.json` (or `%CLAUDE_CONFIG_DIR%\.cre
 
 ### Install and run
 
-1. Download `ClaudeToolbar.exe` from the latest `windows` workflow run (Actions → windows → the newest run → Artifacts → ClaudeToolbar-win-x64) or build it yourself (below). Windows SmartScreen may show "Windows protected your PC" the first time; choose "More info" then "Run anyway". The single-file build is around 70 MB.
+1. Download `ClaudeToolbar.exe` from the latest `windows` workflow run (Actions → windows → the newest run → Artifacts → ClaudeToolbar-win-x64) or build it yourself (below). Windows SmartScreen may show "Windows protected your PC" the first time; choose "More info" then "Run anyway". The single-file build is around 165 MB: it is stored uncompressed and precompiled, which roughly halves its memory use and shortens its start at login.
 2. Run it. The widget appears in the taskbar and an icon appears in the tray. "Run at startup" is on by default; turn it off from the menu or settings.
 3. Make sure you have signed in to Claude Code at least once on this machine (`claude` in a terminal).
 

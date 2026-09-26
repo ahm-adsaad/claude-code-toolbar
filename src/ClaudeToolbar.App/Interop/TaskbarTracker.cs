@@ -11,7 +11,6 @@ public sealed class TaskbarTracker : IDisposable
     private static readonly TimeSpan LocateRetry = TimeSpan.FromSeconds(3);
 
     private readonly WidgetWindow _window;
-    private readonly DispatcherTimer _timer = new(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
     private readonly uint _taskbarCreatedMsg = RegisterWindowMessage("TaskbarCreated");
     private readonly DispatcherTimer _foregroundSettle = new() { Interval = TimeSpan.FromMilliseconds(150) };
     private WinEventHook? _hook;
@@ -23,11 +22,6 @@ public sealed class TaskbarTracker : IDisposable
     {
         _window = window;
         _window.ShellMessage += OnShellMessage;
-        _timer.Tick += (_, _) =>
-        {
-            Evaluate(force: false);
-            Sanity?.Invoke();
-        };
         _foregroundSettle.Tick += (_, _) =>
         {
             _foregroundSettle.Stop();
@@ -39,7 +33,7 @@ public sealed class TaskbarTracker : IDisposable
 
     public event Action? Changed;
 
-    /// <summary>Raised once per second, and on every foreground-window change, regardless of whether the layout changed; the controller re-checks fullscreen and z-order on it.</summary>
+    /// <summary>Raised on every <see cref="Tick"/> and foreground-window change, regardless of whether the layout changed; the controller re-checks fullscreen and z-order on it.</summary>
     public event Action? Sanity;
 
     public void Start()
@@ -48,7 +42,13 @@ public sealed class TaskbarTracker : IDisposable
         // A closing shell flyout (Quick Settings, Start, calendar) drops the taskbar back on top of us without moving it,
         // so the location hook stays silent. The foreground change that accompanies the close is our cue to re-check.
         _foregroundHook ??= new WinEventHook(EVENT_SYSTEM_FOREGROUND, 0, _ => true, OnForegroundChanged);
-        _timer.Start();
+    }
+
+    /// <summary>The once-a-second safety net, driven by the app's own tick so the process wakes once per second, not twice.</summary>
+    public void Tick()
+    {
+        Evaluate(force: false);
+        Sanity?.Invoke();
     }
 
     private void OnForegroundChanged()
@@ -122,7 +122,6 @@ public sealed class TaskbarTracker : IDisposable
 
     public void Dispose()
     {
-        _timer.Stop();
         _foregroundSettle.Stop();
         _window.ShellMessage -= OnShellMessage;
         _hook?.Dispose();

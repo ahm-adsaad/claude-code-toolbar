@@ -32,6 +32,7 @@ public partial class WidgetWindow
     private readonly Grid _flyoutRoot = new() { Background = HitBridge };
     private readonly DispatcherTimer _hoverTimer = new() { Interval = TimeSpan.FromMilliseconds(400) };
     private readonly DispatcherTimer _hideTimer = new() { Interval = TimeSpan.FromMilliseconds(300) };
+    private object? _flyoutShape;
 
     public event Action? Clicked;
     public event Action? MenuRequested;
@@ -92,16 +93,37 @@ public partial class WidgetWindow
         // that is already up must leave it alone: the mouse may have left already, and no second
         // MouseLeave will come to start it again.
         if (!_flyout.IsOpen) _hideTimer.Stop();
-        _flyoutBorder.Background = theme.Background;
-        _flyoutBorder.BorderBrush = theme.BarTrack;
-        _flyoutPanel.Children.Clear();
-        foreach (var line in model.Lines)
-            _flyoutPanel.Children.Add(MakeLine(line, theme, theme.FontSize + 1, 1.0, new Thickness(0, 1, 0, 1)));
-        foreach (var session in sessions)
-            _flyoutPanel.Children.Add(MakeSessionLine(session, theme));
-        if (hint is not null)
-            _flyoutPanel.Children.Add(MakeLine(hint, theme, theme.FontSize, 0.7, new Thickness(0, 1, 0, 1)));
-        _flyoutPanel.Children.Add(MakeLine(model.StatusText, theme, theme.FontSize, 0.7, new Thickness(0, 4, 0, 0)));
+
+        var texts = new List<string>(model.Lines);
+        texts.AddRange(sessions.Select(s => s.Text));
+        if (hint is not null) texts.Add(hint);
+        texts.Add(model.StatusText);
+
+        // The app refreshes an open flyout every second, and a transparent popup redraws in software, so
+        // rebuilding it each time costs real CPU. When the same lines are still there, only their text changes.
+        var shape = (model.Lines.Count, string.Join("\n", sessions.Select(s => s.Id)), hint is not null, theme);
+        if (!shape.Equals(_flyoutShape))
+        {
+            _flyoutShape = shape;
+            _flyoutBorder.Background = theme.Background;
+            _flyoutBorder.BorderBrush = theme.BarTrack;
+            _flyoutPanel.Children.Clear();
+            foreach (var line in model.Lines)
+                _flyoutPanel.Children.Add(MakeLine(line, theme, theme.FontSize + 1, 1.0, new Thickness(0, 1, 0, 1)));
+            foreach (var session in sessions)
+                _flyoutPanel.Children.Add(MakeSessionLine(session, theme));
+            if (hint is not null)
+                _flyoutPanel.Children.Add(MakeLine(hint, theme, theme.FontSize, 0.7, new Thickness(0, 1, 0, 1)));
+            _flyoutPanel.Children.Add(MakeLine(model.StatusText, theme, theme.FontSize, 0.7, new Thickness(0, 4, 0, 0)));
+        }
+        else
+        {
+            for (var i = 0; i < texts.Count; i++)
+            {
+                var block = (TextBlock)_flyoutPanel.Children[i];
+                if (block.Text != texts[i]) block.Text = texts[i];
+            }
+        }
         _flyout.IsOpen = true;
     }
 

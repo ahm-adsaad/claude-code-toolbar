@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -13,6 +14,7 @@ public partial class WidgetWindow : Window
 {
     private readonly UsageRowsControl _rows = new();
     private HwndSource? _source;
+    private IntPtr _displayNotification;
 
     public WidgetWindow()
     {
@@ -31,6 +33,9 @@ public partial class WidgetWindow : Window
     /// <summary>Raw window messages (msg id) for the taskbar tracker.</summary>
     public event Action<int>? ShellMessage;
 
+    /// <summary>The console display went off (false) or came back on or dimmed (true). Windows also sends the current state once registered.</summary>
+    public event Action<bool>? DisplayStateChanged;
+
     /// <summary>A left click on Clawd. The flyout is still up and nothing is acknowledged yet.</summary>
     public event Action? MascotClicked;
 
@@ -44,6 +49,15 @@ public partial class WidgetWindow : Window
         SetWindowLongPtr(Handle, GWL_EXSTYLE, new IntPtr(ex | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TOPMOST));
         _source = HwndSource.FromHwnd(Handle);
         _source?.AddHook(WndProc);
+        var display = GUID_CONSOLE_DISPLAY_STATE;
+        _displayNotification = RegisterPowerSettingNotification(Handle, ref display, DEVICE_NOTIFY_WINDOW_HANDLE);
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        if (_displayNotification != IntPtr.Zero) UnregisterPowerSettingNotification(_displayNotification);
+        _displayNotification = IntPtr.Zero;
+        base.OnClosed(e);
     }
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -52,6 +66,12 @@ public partial class WidgetWindow : Window
         {
             handled = true;
             return new IntPtr(MA_NOACTIVATE);
+        }
+        if (msg == WM_POWERBROADCAST && wParam.ToInt32() == PBT_POWERSETTINGCHANGE && lParam != IntPtr.Zero
+            && Marshal.PtrToStructure<Guid>(lParam) == GUID_CONSOLE_DISPLAY_STATE)
+        {
+            // POWERBROADCAST_SETTING: the GUID, a DWORD length, then the data — 0 off, 1 on, 2 dimmed.
+            DisplayStateChanged?.Invoke(Marshal.ReadInt32(lParam, 20) != 0);
         }
         ShellMessage?.Invoke(msg);
         return IntPtr.Zero;

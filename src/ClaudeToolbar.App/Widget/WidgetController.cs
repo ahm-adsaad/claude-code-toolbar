@@ -27,6 +27,9 @@ public sealed class WidgetController : IDisposable
 
     public void Start() => _tracker.Start();
 
+    /// <summary>Once a second from the app tick: re-read the taskbar and re-check fullscreen and z-order.</summary>
+    public void Tick() => _tracker.Tick();
+
     /// <summary>Forget cached taskbar handles and search again (explorer restart, display change, resume).</summary>
     public void Relocate() => _tracker.Relocate();
 

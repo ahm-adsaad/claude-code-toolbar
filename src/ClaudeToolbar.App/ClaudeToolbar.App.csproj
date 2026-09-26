@@ -14,7 +14,10 @@
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <EnableDefaultApplicationDefinition>true</EnableDefaultApplicationDefinition>
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <!-- A compressed single file is unpacked into memory at every launch: measured 277 MB working set against
+         140 MB uncompressed. ReadyToRun saves a further ~0.4 s of JIT at each login. The exe grows from 66 to 165 MB. -->
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
+    <PublishReadyToRun>true</PublishReadyToRun>
     <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
   </PropertyGroup>
   <ItemGroup>

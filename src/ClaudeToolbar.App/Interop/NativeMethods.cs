@@ -49,6 +49,18 @@ internal static class NativeMethods
     public const int WM_DPICHANGED = 0x02E0;
     public const int MA_NOACTIVATE = 3;
 
+    public const int WM_POWERBROADCAST = 0x218;
+    public const int PBT_POWERSETTINGCHANGE = 0x8013;
+    public const uint DEVICE_NOTIFY_WINDOW_HANDLE = 0;
+    public static readonly Guid GUID_CONSOLE_DISPLAY_STATE = new("6fe69556-704a-47a0-8f24-c28d936fda47");
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr RegisterPowerSettingNotification(IntPtr hRecipient, ref Guid powerSettingGuid, uint flags);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool UnregisterPowerSettingNotification(IntPtr handle);
+
     public const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
     public const uint EVENT_OBJECT_LOCATIONCHANGE = 0x800B;
     public const uint WINEVENT_OUTOFCONTEXT = 0;
