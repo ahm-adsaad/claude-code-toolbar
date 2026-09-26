@@ -14,6 +14,7 @@ public actor UsageMonitor {
     private var refreshing = false
     private var resetTriggeredFor: Date?
     private var pausedSince: Date?
+    private var cachedCredentials: CredentialsState?
 
     public init(credentials: any CredentialsSource, client: any UsageClient, clock: any ClockSource, intervalSeconds: Int = 60) {
         self.credentials = credentials
@@ -60,23 +61,47 @@ public actor UsageMonitor {
         refreshing = true
         defer { refreshing = false }
 
+        // Reading the Keychain launches /usr/bin/security, so a token that is still valid is reused rather than
+        // read again on every refresh. A rejected cached token falls through to a fresh read: Claude Code may
+        // have signed in again since.
+        if let cached = reusableCredentials, await attempt(with: cached, cached: true) { return }
         let source = credentials
         let creds = await Task.detached { source.read() }.value
+        _ = await attempt(with: creds, cached: false)
+    }
 
+    private var reusableCredentials: CredentialsState? {
+        guard let cached = cachedCredentials, let expiresAt = cached.expiresAt,
+              clock.now < expiresAt.addingTimeInterval(-CredentialsPayloadParser.expiryMargin) else { return nil }
+        return cached
+    }
+
+    /// False only when a cached token was rejected, telling the caller to read the credentials afresh.
+    private func attempt(with creds: CredentialsState, cached: Bool) async -> Bool {
         switch creds {
         case .missing:
+            cachedCredentials = nil
             pause()
             publish(status: .noCredentials, message: "Credentials not found", credentials: creds)
         case .invalid(_, let reason):
+            cachedCredentials = nil
             pause()
             publish(status: .noCredentials, message: reason, credentials: creds)
         case .expired:
+            cachedCredentials = nil
             pause()
             publish(status: .expired, message: "Login expired", credentials: creds)
         case .valid(_, let token, _, _):
             let result = await client.fetch(accessToken: token)
+            if case .unauthorized = result {
+                cachedCredentials = nil
+                if cached { return false }
+            } else {
+                cachedCredentials = creds
+            }
             apply(result, credentials: creds)
         }
+        return true
     }
 
     private func apply(_ result: UsageResult, credentials creds: CredentialsState) {

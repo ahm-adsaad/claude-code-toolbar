@@ -179,6 +179,50 @@ final class UsageMonitorTests: XCTestCase {
         XCTAssertFalse(paused)
     }
 
+    func testValidTokenIsReusedInsteadOfReadEveryRefresh() async {
+        let (monitor, source, client) = makeMonitor(validCreds, [.ok(snapshot())])
+        await monitor.refresh()
+        await monitor.refresh()
+        await monitor.refresh()
+        XCTAssertEqual(client.callCount, 3)
+        XCTAssertEqual(source.readCount, 1, "the Keychain is read once while the token stays valid")
+        let state = await monitor.state
+        XCTAssertEqual(state.credentials, validCreds)
+    }
+
+    func testTokenNearExpiryIsReadAgain() async {
+        let (monitor, source, _) = makeMonitor(validCreds, [.ok(snapshot())])
+        await monitor.refresh()
+        clock.advance(3600 - CredentialsPayloadParser.expiryMargin)
+        source.state = .valid(source: "Keychain", accessToken: "tok2", expiresAt: clock.now.addingTimeInterval(3600), subscriptionType: "max")
+        await monitor.refresh()
+        XCTAssertEqual(source.readCount, 2)
+    }
+
+    func testRejectedCachedTokenIsReadAgainAndRetried() async {
+        let (monitor, source, client) = makeMonitor(validCreds, [.ok(snapshot()), .unauthorized, .ok(snapshot())])
+        await monitor.refresh()
+        source.state = .valid(source: "Keychain", accessToken: "fresh", expiresAt: expires, subscriptionType: "max")
+        await monitor.refresh()
+        XCTAssertEqual(source.readCount, 2, "a rejected cached token sends the monitor back to the Keychain")
+        XCTAssertEqual(client.callCount, 3)
+        XCTAssertEqual(client.lastToken, "fresh")
+        let state = await monitor.state
+        XCTAssertEqual(state.status, .ok)
+        let paused = await monitor.isPaused
+        XCTAssertFalse(paused)
+    }
+
+    func testRejectedFreshTokenIsNotReadAgain() async {
+        let (monitor, source, client) = makeMonitor(validCreds, [.unauthorized])
+        await monitor.refresh()
+        XCTAssertEqual(source.readCount, 1)
+        XCTAssertEqual(client.callCount, 1)
+        await monitor.requestRefresh()
+        await monitor.refresh()
+        XCTAssertEqual(source.readCount, 2, "nothing is cached after a rejection")
+    }
+
     func testRefreshIsNotReentrant() async {
         let (monitor, _, client) = makeMonitor(validCreds, [.ok(snapshot())])
         let gate = CheckedContinuationBox()

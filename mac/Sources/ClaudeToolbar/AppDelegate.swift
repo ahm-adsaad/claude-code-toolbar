@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: SettingsWindowController?
     private var settingsModel: SettingsModel?
     private var wakeObserver: WakeObserver?
+    private var visibilityObserver: VisibilityObserver?
     private var networkObserver: NetworkObserver?
     private var openSettingsObserver: NSObjectProtocol?
 
@@ -155,6 +156,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         wakeObserver = WakeObserver { [weak self] in
             Log.info("Woke from sleep")
             self?.controller.requestRefresh()
+        }
+        // Hook events and chimes keep working while paused; only the tick and usage polling stop.
+        visibilityObserver = VisibilityObserver { [weak self] visible in
+            self?.controller.setPaused(!visible)
         }
         networkObserver = NetworkObserver { [weak self] in
             Log.info("Network reachable again")

@@ -64,6 +64,15 @@ final class StatusItemController {
     /// Whether the last rendered image had Clawd in it (hidden mode, or a notice, leaves him out).
     private var mascotShown = false
 
+    /// Everything the menu bar image is drawn from; an equal key means an identical picture.
+    private struct ButtonImageKey: Equatable {
+        let model: StatusItemModel
+        let mascot: MascotModel
+        let settings: AppSettings
+        let appearance: NSAppearance.Name
+    }
+    private var lastImageKey: ButtonImageKey?
+
     /// True while `beforeRender` runs: a badge it changes is painted by the render that follows,
     /// so the setters skip their own repaint instead of painting the same frame twice.
     private var isPreparingRender = false
@@ -105,12 +114,7 @@ final class StatusItemController {
             hoverSentinel = sentinel
         }
         render()
-
-        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
-            Task { @MainActor in await self?.tick() }
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
+        startTicking()
 
         Task { [weak self] in
             await monitor.setStateHandler { newState in
@@ -135,6 +139,33 @@ final class StatusItemController {
         Task {
             await monitor.requestRefresh()
             await tick()
+        }
+    }
+
+    private func startTicking() {
+        guard timer == nil else { return }
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in await self?.tick() }
+        }
+        // Slack lets macOS fire this together with other timers instead of waking the CPU for it alone.
+        timer.tolerance = 0.25
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
+    }
+
+    /// Stops the once-a-second tick, and with it usage polling, while nobody can see the menu bar (screens
+    /// asleep, screen locked, another user switched in). Resuming refreshes at once so nothing shows stale.
+    func setPaused(_ paused: Bool) {
+        if paused {
+            guard let timer else { return }
+            timer.invalidate()
+            self.timer = nil
+            Log.info("Pausing updates")
+        } else {
+            guard timer == nil else { return }
+            Log.info("Resuming updates")
+            startTicking()
+            requestRefresh()
         }
     }
 
@@ -176,7 +207,13 @@ final class StatusItemController {
         let mascot = MascotModelBuilder.build(status: model, mascotMode: settings.behavior.mascot,
                                               armAngle: currentArmAngle(), badge: badge, badgeLit: badgeLit)
         mascotShown = mascot.visible && model.notice == nil
-        button.image = StatusItemRenderer.render(model: model, mascot: mascot, settings: settings, appearance: button.effectiveAppearance)
+        // A new image makes the menu bar lay out and redraw, and macOS bills that to us. The tick runs every
+        // second but the picture changes about once a minute, so only a different picture is handed over.
+        let key = ButtonImageKey(model: model, mascot: mascot, settings: settings, appearance: button.effectiveAppearance.name)
+        if key != lastImageKey {
+            lastImageKey = key
+            button.image = StatusItemRenderer.render(model: model, mascot: mascot, settings: settings, appearance: button.effectiveAppearance)
+        }
         let text = tooltip(for: model)
         if button.toolTip != text { button.toolTip = text }
     }
@@ -204,6 +241,7 @@ final class StatusItemController {
         let timer = Timer(timeInterval: 1.0 / Double(WaveAnimation.framesPerSecond), repeats: true) { [weak self] _ in
             Task { @MainActor in self?.waveFrame() }
         }
+        timer.tolerance = 0.01
         RunLoop.main.add(timer, forMode: .common)
         waveTimer = timer
         renderButton()
