@@ -50,7 +50,7 @@ This works wherever Claude Code hooks fire: the terminal, the VS Code and JetBra
 7d ▮▮▯▯▯▯▯▯▯▯ 18%  3d 4h
 ```
 
-Hover for exact reset times and the last update time. Left-click (away from Clawd) opens settings. Right-click for refresh / settings / run at startup / exit. A tray icon offers the same menu.
+Hover for exact reset times and the last update time. Left-click (away from Clawd) opens settings. Right-click for refresh / settings / run at startup / desktop shortcut / exit. A tray icon offers the same menu.
 
 ### How it signs in
 
@@ -59,7 +59,7 @@ It reads `%USERPROFILE%\.claude\.credentials.json` (or `%CLAUDE_CONFIG_DIR%\.cre
 ### Install and run
 
 1. Download `ClaudeToolbar.exe` from the latest `windows` workflow run (Actions → windows → the newest run → Artifacts → ClaudeToolbar-win-x64) or build it yourself (below). Windows SmartScreen may show "Windows protected your PC" the first time; choose "More info" then "Run anyway". The single-file build is around 165 MB: it is stored uncompressed and precompiled, which roughly halves its memory use and shortens its start at login.
-2. Run it. The widget appears in the taskbar and an icon appears in the tray. "Run at startup" is on by default; turn it off from the menu or settings.
+2. Run it. The widget appears in the taskbar and an icon appears in the tray. "Run at startup" is on by default; turn it off from the menu or settings. The app keeps a "Claude Toolbar" entry in the Start menu, and the first launch also puts a shortcut on the desktop, so after Exit you can start it again from either one; both follow the exe if you move it. Turn the desktop shortcut off or back on from the menu or settings, or just delete it.
 3. Make sure you have signed in to Claude Code at least once on this machine (`claude` in a terminal).
 
 ### Settings
@@ -68,7 +68,7 @@ Open from the widget, the tray icon, or by launching the exe a second time.
 
 - Appearance: presets (Dark, Light, Claude, Mono), colours for background, text, bar track and the three bar levels, font size, corner radius, warning/critical thresholds.
 - Rows: which windows to show, and whether to show the label, bar, percent and time.
-- Behaviour: refresh interval, gap from the tray, hide when a fullscreen app is active, run at startup.
+- Behaviour: refresh interval, gap from the tray, hide when a fullscreen app is active, run at startup, desktop shortcut.
 - Mascot: waves on hover and at thresholds, on hover only, or off.
 - Notifications: listen for Claude Code events, port, chime, install/remove the hooks, test.
 - Account: which credentials file is in use and the login state.

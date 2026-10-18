@@ -41,10 +41,12 @@ public partial class App : Application
             return;
         }
 
+        var firstRun = false;
         TrySafe(() =>
         {
             Settings = SettingsStore.Load();
-            if (!File.Exists(SettingsStore.Path)) SettingsStore.Save(Settings);
+            firstRun = !File.Exists(SettingsStore.Path);
+            if (firstRun) SettingsStore.Save(Settings);
         }, "load settings");
 
         _menu = new AppMenu(Settings.Behavior.RunAtStartup);
@@ -57,12 +59,14 @@ public partial class App : Application
             TrySafe(() => StartupRegistration.Apply(on), "startup registration");
             SaveSettingsDebounced();
         };
+        _menu.DesktopShortcutToggled += SetDesktopShortcut;
 
         _tray = new TrayIcon("Claude Toolbar");
         _tray.MenuRequested += _menu.Show;
         _tray.SettingsRequested += OpenSettings;
 
         TrySafe(() => StartupRegistration.Apply(Settings.Behavior.RunAtStartup), "startup registration");
+        TrySafe(() => AppShortcuts.Refresh(createDesktop: firstRun), "shortcuts");
 
         Log.Info("Started");
         TrySafe(() => OnStartupCore(e), "startup");
@@ -78,6 +82,13 @@ public partial class App : Application
     partial void RefreshNowCore();
 
     public TrayIcon? Tray => _tray;
+
+    /// <summary>The desktop shortcut lives on disk rather than in settings, so deleting it by hand is never undone.</summary>
+    public void SetDesktopShortcut(bool enabled)
+    {
+        TrySafe(() => AppShortcuts.SetDesktop(enabled), "desktop shortcut");
+        _settingsViewModel?.RefreshDesktopShortcut();
+    }
 
     public void SaveSettingsDebounced()
     {

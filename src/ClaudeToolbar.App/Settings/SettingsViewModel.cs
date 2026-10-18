@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using ClaudeToolbar.App.Services;
 using ClaudeToolbar.Core.Credentials;
 using ClaudeToolbar.Core.Refresh;
 using ClaudeToolbar.Core.Settings;
@@ -111,6 +112,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     public double TrayGapPx { get => _s.Behavior.TrayGapPx; set { _s.Behavior.TrayGapPx = (int)Math.Round(value); Changed(); } }
     public bool HideInFullscreen { get => _s.Behavior.HideInFullscreen; set { _s.Behavior.HideInFullscreen = value; Changed(); } }
     public bool RunAtStartup { get => _s.Behavior.RunAtStartup; set { _s.Behavior.RunAtStartup = value; Changed(); } }
+    public bool DesktopShortcut { get => AppShortcuts.HasDesktop(); set => App.Current.SetDesktopShortcut(value); }
+    public void RefreshDesktopShortcut() => Raise(nameof(DesktopShortcut));
 
     public sealed record MascotOption(string Value, string Label);
 

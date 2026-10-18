@@ -134,6 +134,7 @@
                         <WrapPanel Margin="0,6,0,0">
                             <CheckBox Content="Hide when a fullscreen app is active" IsChecked="{Binding HideInFullscreen}" />
                             <CheckBox Content="Run at startup" IsChecked="{Binding RunAtStartup}" />
+                            <CheckBox Content="Desktop shortcut" IsChecked="{Binding DesktopShortcut}" />
                         </WrapPanel>
                         <Grid Style="{StaticResource Row}" Margin="0,6,0,0">
                             <Grid.ColumnDefinitions>
