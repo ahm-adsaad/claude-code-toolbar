@@ -22,6 +22,36 @@ public class SessionTrackerTests
     }
 
     [Fact]
+    public void WorkingCount_CountsWorkingSessionsOnly()
+    {
+        var t = new SessionTracker();
+        t.Apply(Ev(SessionEventKind.PromptSubmitted, id: "a"), T0);
+        t.Apply(Ev(SessionEventKind.PromptSubmitted, id: "b"), T0);
+        t.Apply(Ev(SessionEventKind.Stopped, id: "b"), T0);
+        Assert.Equal(1, t.WorkingCount);
+    }
+
+    [Fact]
+    public void IdlePrompt_EndsAWorkingTurnWithNoAgents()
+    {
+        var t = new SessionTracker();
+        t.Apply(Ev(SessionEventKind.PromptSubmitted), T0);
+        Assert.Null(t.Apply(Ev(SessionEventKind.Info, detail: "idle_prompt"), T0.AddMinutes(1)));
+        Assert.Equal(SessionState.Idle, t.Sessions[0].State);
+        Assert.Equal(0, t.WorkingCount);
+    }
+
+    [Fact]
+    public void IdlePrompt_KeepsWorkingWhileAgentsRun()
+    {
+        var t = new SessionTracker();
+        t.Apply(Ev(SessionEventKind.PromptSubmitted), T0);
+        t.Apply(Ev(SessionEventKind.Stopped, agents: 2), T0);
+        t.Apply(Ev(SessionEventKind.Info, detail: "idle_prompt"), T0.AddMinutes(1));
+        Assert.Equal(SessionState.Working, t.Sessions[0].State);
+    }
+
+    [Fact]
     public void NameFallsBackToTheSessionIdPrefix()
     {
         var t = new SessionTracker();

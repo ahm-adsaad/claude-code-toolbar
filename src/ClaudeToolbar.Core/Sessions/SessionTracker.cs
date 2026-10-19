@@ -36,7 +36,10 @@ public sealed class SessionTracker
                 Set(e.SessionId, name, existing?.State ?? SessionState.Idle, now, existing?.Message, known, agents);
                 return null;
             case SessionEventKind.Info:
-                Set(e.SessionId, name, existing?.State ?? SessionState.Idle, now, existing?.Message, known, agents);
+                // An Esc interrupt or a terminal closed mid-turn sends no Stop; Claude Code's idle reminder a
+                // minute later is the only sign that the turn is over. While agents run the session is still busy.
+                var turnOver = e.Detail == "idle_prompt" && existing?.State == SessionState.Working && agents == 0;
+                Set(e.SessionId, name, turnOver ? SessionState.Idle : existing?.State ?? SessionState.Idle, now, existing?.Message, known, agents);
                 return null;
             case SessionEventKind.PromptSubmitted:
                 Set(e.SessionId, name, SessionState.Working, now, null, known, agents);
@@ -65,6 +68,9 @@ public sealed class SessionTracker
     }
 
     public SessionInfo? Session(string id) => _sessions.GetValueOrDefault(id);
+
+    /// <summary>How many sessions Claude is working in right now; the pace estimate counts working time with it.</summary>
+    public int WorkingCount => _sessions.Values.Count(s => s.State == SessionState.Working);
 
     /// <summary>The session a click on Clawd goes to: most urgent state, newest wins ties; sessions without a host cannot be jumped to.</summary>
     public SessionInfo? JumpCandidate => _sessions.Values
