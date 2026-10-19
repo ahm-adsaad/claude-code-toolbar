@@ -94,7 +94,7 @@ public partial class WidgetWindow
         // MouseLeave will come to start it again.
         if (!_flyout.IsOpen) _hideTimer.Stop();
 
-        var texts = new List<string>(model.Lines);
+        var texts = model.Lines.Select(l => l.Text).ToList();
         texts.AddRange(sessions.Select(s => s.Text));
         if (hint is not null) texts.Add(hint);
         texts.Add(model.StatusText);
@@ -109,7 +109,7 @@ public partial class WidgetWindow
             _flyoutBorder.BorderBrush = theme.BarTrack;
             _flyoutPanel.Children.Clear();
             foreach (var line in model.Lines)
-                _flyoutPanel.Children.Add(MakeLine(line, theme, theme.FontSize + 1, 1.0, new Thickness(0, 1, 0, 1)));
+                _flyoutPanel.Children.Add(MakeLine(line.Text, theme, theme.FontSize + 1, 1.0, new Thickness(0, 1, 0, 1)));
             foreach (var session in sessions)
                 _flyoutPanel.Children.Add(MakeSessionLine(session, theme));
             if (hint is not null)

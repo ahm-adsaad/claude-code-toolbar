@@ -1,5 +1,6 @@
 using ClaudeToolbar.Core.Credentials;
 using ClaudeToolbar.Core.Formatting;
+using ClaudeToolbar.Core.Pace;
 using ClaudeToolbar.Core.Refresh;
 using ClaudeToolbar.Core.Settings;
 using ClaudeToolbar.Core.Usage;
@@ -19,6 +20,45 @@ public class WidgetModelBuilderTests
         null,
         null,
         Now);
+
+    private static Dictionary<UsageLimit, PaceEstimate> Pace(UsageLimit limit, PaceVerdict verdict, TimeSpan workLeft) =>
+        new() { [limit] = new PaceEstimate(verdict, workLeft, null, 1, TimeSpan.FromHours(9), PaceBasis.Work) };
+
+    private static MonitorState WithFable(UsageStatus status = UsageStatus.Ok) =>
+        new(status, Snap() with { SevenDayFable = new UsageWindow(72, Now.AddDays(3)) }, Now, null, Creds);
+
+    [Fact]
+    public void Warning_WhenRunsOutFirst()
+    {
+        var m = WidgetModelBuilder.Build(WithFable(), AppSettings.CreateDefault(), Now, Pace(UsageLimit.SevenDayFable, PaceVerdict.RunsOutFirst, new TimeSpan(6, 12, 0)));
+        var fable = m.Rows[^1];
+        Assert.Equal("~6h work", fable.Warning);
+        Assert.Equal(BarLevel.Warn, fable.WarningLevel);
+        Assert.Equal("3d 0h", fable.TimeText);
+        Assert.Null(m.Rows[0].Warning);
+    }
+
+    [Fact]
+    public void Warning_CriticalUnderThirtyMinutes()
+    {
+        var m = WidgetModelBuilder.Build(WithFable(), AppSettings.CreateDefault(), Now, Pace(UsageLimit.FiveHour, PaceVerdict.RunsOutFirst, TimeSpan.FromMinutes(20)));
+        Assert.Equal("~20m work", m.Rows[0].Warning);
+        Assert.Equal(BarLevel.Crit, m.Rows[0].WarningLevel);
+    }
+
+    [Fact]
+    public void NoWarning_WhenItLasts()
+    {
+        var m = WidgetModelBuilder.Build(WithFable(), AppSettings.CreateDefault(), Now, Pace(UsageLimit.SevenDayFable, PaceVerdict.Lasts, TimeSpan.FromHours(90)));
+        Assert.Null(m.Rows[^1].Warning);
+    }
+
+    [Fact]
+    public void NoWarning_WhenLoginExpired()
+    {
+        var m = WidgetModelBuilder.Build(WithFable(UsageStatus.Expired), AppSettings.CreateDefault(), Now, Pace(UsageLimit.SevenDayFable, PaceVerdict.RunsOutFirst, TimeSpan.FromHours(6)));
+        Assert.Null(m.Rows[^1].Warning);
+    }
 
     [Fact]
     public void OkStateBuildsTwoDefaultRows()
