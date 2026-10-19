@@ -93,6 +93,15 @@ final class StatusItemModelBuilderTests: XCTestCase {
         XCTAssertEqual(m.rows[0].level, .warn)
     }
 
+    func testFableRowHiddenWhenApiHasNone() {
+        var s = AppSettings.createDefault()
+        s.rows.showSevenDaySonnet = true
+        let m = StatusItemModelBuilder.build(state: state(.ok, snapshot: snapshot), settings: s, now: now)
+        // Plans without a Fable limit would otherwise carry a permanent "—" row; other rows keep their placeholder.
+        XCTAssertEqual(m.rows.map(\.label), ["5h", "7d", "7d Sonnet"])
+        XCTAssertEqual(m.rows[2].percentText, "—")
+    }
+
     func testFableRowFollowsSonnet() {
         var s = AppSettings.createDefault()
         s.rows.showSevenDayFable = true

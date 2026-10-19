@@ -52,9 +52,11 @@ public enum StatusItemModelBuilder {
         let r = settings.rows
         var rows: [StatusRow] = []
 
-        func add(_ show: Bool, _ label: String, _ window: UsageWindow?) {
+        func add(_ show: Bool, _ label: String, _ window: UsageWindow?, hideWhenMissing: Bool = false) {
             guard show else { return }
             guard let window else {
+                // Plans without a Fable limit would otherwise carry a permanent "—" row.
+                if hideWhenMissing { return }
                 rows.append(StatusRow(label: label, utilization: 0, percentText: placeholder, timeText: "", level: .ok, hasData: false))
                 return
             }
@@ -72,7 +74,7 @@ public enum StatusItemModelBuilder {
         add(r.showSevenDay, "7d", state.snapshot?.sevenDay)
         add(r.showSevenDayOpus, "7d Opus", state.snapshot?.sevenDayOpus)
         add(r.showSevenDaySonnet, "7d Sonnet", state.snapshot?.sevenDaySonnet)
-        add(r.showSevenDayFable, "7d Fable", state.snapshot?.sevenDayFable)
+        add(r.showSevenDayFable, "7d Fable", state.snapshot?.sevenDayFable, hideWhenMissing: true)
 
         let expired = state.status == .expired
         return StatusItemModel(

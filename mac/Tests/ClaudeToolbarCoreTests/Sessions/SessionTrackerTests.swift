@@ -19,6 +19,30 @@ final class SessionTrackerTests: XCTestCase {
         XCTAssertEqual(t.summary, "1 session · idle (my-repo)")
     }
 
+    func testWorkingCountCountsWorkingSessionsOnly() {
+        let t = SessionTracker()
+        _ = t.apply(ev(.promptSubmitted, id: "a"), now: t0)
+        _ = t.apply(ev(.promptSubmitted, id: "b"), now: t0)
+        _ = t.apply(ev(.stopped, id: "b"), now: t0)
+        XCTAssertEqual(t.workingCount, 1)
+    }
+
+    func testIdlePromptEndsAWorkingTurnWithNoAgents() {
+        let t = SessionTracker()
+        _ = t.apply(ev(.promptSubmitted), now: t0)
+        XCTAssertNil(t.apply(ev(.info, detail: "idle_prompt"), now: t0.addingTimeInterval(60)))
+        XCTAssertEqual(t.sessions[0].state, .idle)
+        XCTAssertEqual(t.workingCount, 0)
+    }
+
+    func testIdlePromptKeepsWorkingWhileAgentsRun() {
+        let t = SessionTracker()
+        _ = t.apply(ev(.promptSubmitted), now: t0)
+        _ = t.apply(ev(.stopped, agents: 2), now: t0)
+        _ = t.apply(ev(.info, detail: "idle_prompt"), now: t0.addingTimeInterval(60))
+        XCTAssertEqual(t.sessions[0].state, .working)
+    }
+
     func testNameFallsBackToTheSessionIdPrefix() {
         let t = SessionTracker()
         _ = t.apply(ev(.start, id: "0123456789abcdef", cwd: nil), now: t0)

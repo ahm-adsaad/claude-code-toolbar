@@ -55,8 +55,14 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertThrowsError(try SettingsJSON.decode("[]"))
     }
 
-    func testFableRowIsOffByDefaultAndDecodes() throws {
-        XCTAssertFalse(AppSettings.createDefault().rows.showSevenDayFable)
+    func testFableRowOnByDefaultForFreshInstalls() throws {
+        XCTAssertTrue(AppSettings().rows.showSevenDayFable)
+        XCTAssertTrue(AppSettings.createDefault().rows.showSevenDayFable)
+    }
+
+    func testStoredFableOffStaysOff() throws {
+        // Older builds saved the old default explicitly; it cannot be told apart from a deliberate "off".
+        XCTAssertFalse(try SettingsJSON.decode(#"{ "rows": { "showSevenDayFable": false } }"#).rows.showSevenDayFable)
         XCTAssertTrue(try SettingsJSON.decode(#"{ "rows": { "showSevenDayFable": true } }"#).rows.showSevenDayFable)
     }
 }

@@ -50,8 +50,14 @@ public final class SessionTracker {
         case .ended:
             sessions_.removeValue(forKey: e.sessionId)
             return nil
-        case .start, .info:
+        case .start:
             set(e.sessionId, name, existing?.state ?? .idle, now, existing?.message, known, agents)
+            return nil
+        case .info:
+            // An Esc interrupt or a terminal closed mid-turn sends no Stop; Claude Code's idle reminder a
+            // minute later is the only sign that the turn is over. While agents run the session is still busy.
+            let turnOver = e.detail == "idle_prompt" && existing?.state == .working && agents == 0
+            set(e.sessionId, name, turnOver ? .idle : existing?.state ?? .idle, now, existing?.message, known, agents)
             return nil
         case .promptSubmitted:
             set(e.sessionId, name, .working, now, nil, known, agents)
@@ -77,6 +83,9 @@ public final class SessionTracker {
     }
 
     public func session(id: String) -> SessionInfo? { sessions_[id] }
+
+    /// How many sessions Claude is working in right now; the pace estimate counts working time with it.
+    public var workingCount: Int { sessions_.values.filter { $0.state == .working }.count }
 
     /// The session a click on Clawd goes to: most urgent state, newest wins ties; sessions without a host cannot be jumped to.
     public var jumpCandidate: SessionInfo? {

@@ -30,7 +30,8 @@ public struct RowSettings: Codable, Equatable, Sendable {
     public var showSevenDay = true
     public var showSevenDayOpus = false
     public var showSevenDaySonnet = false
-    public var showSevenDayFable = false
+    /// On for fresh installs only: saved files hold the old default explicitly, and it cannot be told apart from a choice.
+    public var showSevenDayFable = true
     public var showLabel = true
     public var showBar = true
     public var showPercent = true
