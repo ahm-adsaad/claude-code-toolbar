@@ -24,7 +24,7 @@ final class HostResolver: @unchecked Sendable {
         lock.unlock()
 
         let result = HostChain.resolve(startPid: Int(claudePid), table: ProcessTable.chain(from: claudePid), catalog: KnownHosts.mac)
-        let host = result.map { SessionHost(pid: $0.pid, name: $0.displayName, resolvedAt: Date()) }
+        let host = result.map { SessionHost(pid: $0.pid, name: $0.displayName, resolvedAt: Date(), clientPid: key.pid, clientStart: key.start) }
         lock.lock()
         if cache.count > 256 { cache.removeAll() }
         cache[key] = host

@@ -36,8 +36,9 @@ public sealed class SessionTracker
                 Set(e.SessionId, name, existing?.State ?? SessionState.Idle, now, existing?.Message, known, agents);
                 return null;
             case SessionEventKind.Info:
-                // An Esc interrupt or a terminal closed mid-turn sends no Stop; Claude Code's idle reminder a
-                // minute later is the only sign that the turn is over. While agents run the session is still busy.
+                // An Esc interrupt sends no Stop; Claude Code's idle reminder a minute later is the only sign that
+                // the turn is over. While agents run the session is still busy. A closed terminal sends nothing at
+                // all: Prune drops it once its Claude Code process is gone.
                 var turnOver = e.Detail == "idle_prompt" && existing?.State == SessionState.Working && agents == 0;
                 Set(e.SessionId, name, turnOver ? SessionState.Idle : existing?.State ?? SessionState.Idle, now, existing?.Message, known, agents);
                 return null;
@@ -105,10 +106,11 @@ public sealed class SessionTracker
         }
     }
 
-    public void Prune(DateTimeOffset now)
+    /// <summary>Drops sessions not heard from in <see cref="StaleAfter"/>, and those whose Claude Code process <paramref name="isGone"/> says has exited.</summary>
+    public void Prune(DateTimeOffset now, Func<SessionHost, bool>? isGone = null)
     {
         foreach (var (id, s) in _sessions.ToList())
-            if (now - s.UpdatedAt > StaleAfter) _sessions.Remove(id);
+            if (now - s.UpdatedAt > StaleAfter || (s.Host is { } host && isGone?.Invoke(host) == true)) _sessions.Remove(id);
     }
 
     public MascotBadge Badge => _sessions.Values

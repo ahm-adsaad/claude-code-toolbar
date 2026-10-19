@@ -5,11 +5,17 @@ public struct SessionHost: Equatable, Sendable {
     public let pid: Int
     public let name: String
     public let resolvedAt: Date
+    /// The Claude Code process itself and its start time as the platform reports it; 0 when unknown.
+    /// A reused pid has a different start time, so the pair says whether that process is still running.
+    public let clientPid: Int
+    public let clientStart: Int64
 
-    public init(pid: Int, name: String, resolvedAt: Date) {
+    public init(pid: Int, name: String, resolvedAt: Date, clientPid: Int = 0, clientStart: Int64 = 0) {
         self.pid = pid
         self.name = name
         self.resolvedAt = resolvedAt
+        self.clientPid = clientPid
+        self.clientStart = clientStart
     }
 }
 

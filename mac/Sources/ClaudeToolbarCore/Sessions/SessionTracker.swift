@@ -54,8 +54,9 @@ public final class SessionTracker {
             set(e.sessionId, name, existing?.state ?? .idle, now, existing?.message, known, agents)
             return nil
         case .info:
-            // An Esc interrupt or a terminal closed mid-turn sends no Stop; Claude Code's idle reminder a
-            // minute later is the only sign that the turn is over. While agents run the session is still busy.
+            // An Esc interrupt sends no Stop; Claude Code's idle reminder a minute later is the only sign that
+            // the turn is over. While agents run the session is still busy. A closed terminal sends nothing at
+            // all: prune drops it once its Claude Code process is gone.
             let turnOver = e.detail == "idle_prompt" && existing?.state == .working && agents == 0
             set(e.sessionId, name, turnOver ? .idle : existing?.state ?? .idle, now, existing?.message, known, agents)
             return nil
@@ -125,8 +126,9 @@ public final class SessionTracker {
         }
     }
 
-    public func prune(now: Date) {
-        sessions_ = sessions_.filter { now.timeIntervalSince($0.value.updatedAt) <= Self.staleAfter }
+    /// Drops sessions not heard from in `staleAfter`, and those whose Claude Code process `isGone` says has exited.
+    public func prune(now: Date, isGone: (SessionHost) -> Bool = { _ in false }) {
+        sessions_ = sessions_.filter { now.timeIntervalSince($0.value.updatedAt) <= Self.staleAfter && !($0.value.host.map(isGone) ?? false) }
     }
 
     public var badge: MascotBadge {

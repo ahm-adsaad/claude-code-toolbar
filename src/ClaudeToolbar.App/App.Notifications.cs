@@ -158,7 +158,9 @@ public partial class App
         if (DateTime.UtcNow - _lastPrune > TimeSpan.FromMinutes(1))
         {
             _lastPrune = DateTime.UtcNow;
-            _sessions.Prune(DateTimeOffset.UtcNow);
+            // A terminal closed mid-turn sends no hook at all; without this its session would count as working for hours.
+            _sessions.Prune(DateTimeOffset.UtcNow, host => host.ClientPid > 0 && host.ClientStart != DateTimeOffset.MinValue
+                && ProcessTable.StartTime(host.ClientPid) != host.ClientStart);
             AdvancePace();
             _badge = _sessions.Badge;
             // A pruned session must not leave a tooltip summarising sessions that are no longer there.

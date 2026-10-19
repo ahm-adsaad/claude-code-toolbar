@@ -111,6 +111,39 @@ final class PaceTrackerTests: XCTestCase {
         XCTAssertEqual(t.export().workMinutes, 10)
     }
 
+    func testSuspendTickBeforeSleepDoesNotRestartTheClock() {
+        let t = PaceTracker()
+        t.advance(workingSessions: 1, now: t0)
+        t.suspend(now: minutes(10))
+        t.advance(workingSessions: 1, now: minutes(10).addingTimeInterval(1))
+        t.advance(workingSessions: 1, now: minutes(8 * 60))
+        XCTAssertEqual(t.export().workMinutes, 10, accuracy: 1e-9)
+    }
+
+    func testCancelledSleepCountsAgainAfterAMinute() {
+        let t = PaceTracker()
+        t.advance(workingSessions: 1, now: t0)
+        t.suspend(now: minutes(10))
+        t.advance(workingSessions: 1, now: minutes(11))
+        t.advance(workingSessions: 1, now: minutes(21))
+        XCTAssertEqual(t.export().workMinutes, 20, accuracy: 1e-9)
+    }
+
+    func testSteadyUseNearTheResetDoesNotFlicker() {
+        // A point every 4 minutes of steady work, read every minute: at this pace the limit runs out 10 minutes before
+        // the reset, and the answer should say so at every reading and between them.
+        let t = PaceTracker()
+        let resets = minutes(370)
+        for m in 0...120 {
+            let at = minutes(Double(m))
+            t.record(five(Double(10 + m / 4), at, resets: resets), workingSessions: 1)
+            if m >= 40 { XCTAssertEqual(t.estimate(.fiveHour, now: at, workingSessions: 1).verdict, .runsOutFirst, "minute \(m)") }
+            let between = at.addingTimeInterval(30)
+            t.advance(workingSessions: 1, now: between)
+            if m >= 40 { XCTAssertEqual(t.estimate(.fiveHour, now: between, workingSessions: 1).verdict, .runsOutFirst, "minute \(m)½") }
+        }
+    }
+
     func testClockGoingBackwardsAddsNothing() {
         let t = PaceTracker()
         t.advance(workingSessions: 1, now: t0)

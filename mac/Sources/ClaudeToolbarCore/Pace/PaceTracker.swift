@@ -9,9 +9,11 @@ public final class PaceTracker {
     private static let maxPoints = 200
     private static let resetShift: TimeInterval = 10 * 60
     private static let resetDrop: Double = 5
+    private static let sleepSettle: TimeInterval = 60
 
     private var state: PaceState
     private var last: Date?
+    private var suspendedAt: Date?
     private var count = 0
 
     public init(restored: PaceState? = nil) {
@@ -25,6 +27,15 @@ public final class PaceTracker {
 
     /// Counts the time since the last call at the number of sessions that were working then.
     public func advance(workingSessions: Int, now: Date) {
+        if let since = suspendedAt {
+            // The sleep notice comes a moment before the machine sleeps; a tick in between must not restart the clock,
+            // or the whole sleep would count once it wakes. A minute on, it has slept and woken, or the sleep was called off.
+            count = workingSessions
+            if now.timeIntervalSince(since) < Self.sleepSettle { return }
+            suspendedAt = nil
+            last = now
+            return
+        }
         if let last {
             if now <= last {
                 // A clock set back adds nothing; keeping the later time avoids counting the same minutes twice.
@@ -41,10 +52,10 @@ public final class PaceTracker {
         count = workingSessions
     }
 
-    /// The machine is going to sleep: count up to now, then nothing until the next `advance`.
+    /// The machine is going to sleep: count up to now, then nothing until a call a minute or more later.
     public func suspend(now: Date) {
         advance(workingSessions: count, now: now)
-        last = nil
+        suspendedAt = now
     }
 
     public func record(_ snapshot: UsageSnapshot, workingSessions: Int) {
@@ -87,13 +98,14 @@ public final class PaceTracker {
         }
         guard let oldest else { return .learning }
         let start = newest ?? oldest
+        // Where the reading last moved; it has the same value as the latest one.
+        let moved = history.points.last ?? cur
 
         let dU = cur.utilization - start.utilization
         let dW = cur.workMinutes - start.workMinutes
         let dA = cur.activeMinutes - start.activeMinutes
         let dT = cur.at.timeIntervalSince(start.at) / 60
         let toReset = history.resetsAt.map { $0.timeIntervalSince(now) / 60 }
-        let left = 100 - cur.utilization
 
         let workLeft: Double
         let available: Double?
@@ -101,7 +113,8 @@ public final class PaceTracker {
         let basis: PaceBasis
         let span: Double
         if dW > 0 {
-            let sessionMinutesLeft = left / (dU / dW)
+            let sessionMinutesLeft = Self.minutesLeft(cur.utilization, rise: dU, toMoved: moved.workMinutes - start.workMinutes,
+                                                      toNow: state.workMinutes - start.workMinutes)
             // Minutes in which several sessions worked count once each, so the answer is in the user's own time.
             workLeft = sessionMinutesLeft / max(1, dW / dA)
             if workingSessions >= 2 { workLeftNow = sessionMinutesLeft / Double(workingSessions) }
@@ -112,7 +125,8 @@ public final class PaceTracker {
             span = dA
         } else {
             if dT <= 0 { return .learning }
-            workLeft = left / (dU / dT)
+            let sinceStart = max(now, cur.at).timeIntervalSince(start.at) / 60
+            workLeft = Self.minutesLeft(cur.utilization, rise: dU, toMoved: moved.at.timeIntervalSince(start.at) / 60, toNow: sinceStart)
             available = toReset
             basis = .clock
             span = dT
@@ -121,6 +135,17 @@ public final class PaceTracker {
         let verdict: PaceVerdict = available.map { workLeft < $0 } == true ? .runsOutFirst : .lasts
         return PaceEstimate(verdict: verdict, workLeft: Self.seconds(workLeft), workLeftNow: workLeftNow.map(Self.seconds),
                             sessionsNow: workingSessions, span: Self.seconds(span), basis: basis)
+    }
+
+    /// Time left at the rate the limit rose by `rise` points. The reading moves in whole points, so the rate runs to where
+    /// it last moved and the time since then is progress towards the next point; measuring to the latest reading instead
+    /// would sag between points and flip the answer back and forth near the reset. A next point that is overdue lowers
+    /// the rate, so a pause still slows it.
+    private static func minutesLeft(_ utilization: Double, rise: Double, toMoved: Double, toNow: Double) -> Double {
+        var rate = (rise + 1) / toNow
+        if toMoved > 0 { rate = min(rate, rise / toMoved) }
+        let used = utilization + min(max(rate * (toNow - toMoved), 0), 1)
+        return (100 - used) / rate
     }
 
     public func export() -> PaceState { state }

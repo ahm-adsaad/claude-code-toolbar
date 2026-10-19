@@ -14,9 +14,11 @@ public sealed class PaceTracker
     private const int MaxPoints = 200;
     private static readonly TimeSpan ResetShift = TimeSpan.FromMinutes(10);
     private const double ResetDrop = 5;
+    private static readonly TimeSpan SleepSettle = TimeSpan.FromMinutes(1);
 
     private readonly PaceState _state;
     private DateTimeOffset? _last;
+    private DateTimeOffset? _suspendedAt;
     private int _count;
 
     public PaceTracker(PaceState? restored = null) => _state = restored is null ? new PaceState() : Copy(restored);
@@ -28,6 +30,16 @@ public sealed class PaceTracker
     /// <summary>Counts the time since the last call at the number of sessions that were working then.</summary>
     public void Advance(int workingSessions, DateTimeOffset now)
     {
+        if (_suspendedAt is { } since)
+        {
+            // The sleep notice comes a moment before the machine sleeps; a tick in between must not restart the clock,
+            // or the whole sleep would count once it wakes. A minute on, it has slept and woken, or the sleep was called off.
+            _count = workingSessions;
+            if (now - since < SleepSettle) return;
+            _suspendedAt = null;
+            _last = now;
+            return;
+        }
         if (_last is { } last)
         {
             if (now <= last)
@@ -47,11 +59,11 @@ public sealed class PaceTracker
         _count = workingSessions;
     }
 
-    /// <summary>The machine is going to sleep: count up to now, then nothing until the next <see cref="Advance"/>.</summary>
+    /// <summary>The machine is going to sleep: count up to now, then nothing until a call a minute or more later.</summary>
     public void Suspend(DateTimeOffset now)
     {
         Advance(_count, now);
-        _last = null;
+        _suspendedAt = now;
     }
 
     public void Record(UsageSnapshot snapshot, int workingSessions)
@@ -99,12 +111,13 @@ public sealed class PaceTracker
         if (oldest is null) return PaceEstimate.Learning;
         start ??= oldest;
 
+        // Where the reading last moved; it has the same value as the latest one.
+        var moved = history.Points[^1];
         var dU = cur.Utilization - start.Utilization;
         var dW = cur.WorkMinutes - start.WorkMinutes;
         var dA = cur.ActiveMinutes - start.ActiveMinutes;
         var dT = (cur.At - start.At).TotalMinutes;
         var toReset = history.ResetsAt is { } resets ? (resets - now).TotalMinutes : (double?)null;
-        var left = 100 - cur.Utilization;
 
         double workLeft;
         double? available;
@@ -113,7 +126,7 @@ public sealed class PaceTracker
         double span;
         if (dW > 0)
         {
-            var sessionMinutesLeft = left / (dU / dW);
+            var sessionMinutesLeft = MinutesLeft(cur.Utilization, dU, moved.WorkMinutes - start.WorkMinutes, _state.WorkMinutes - start.WorkMinutes);
             // Minutes in which several sessions worked count once each, so the answer is in the user's own time.
             workLeft = sessionMinutesLeft / Math.Max(1, dW / dA);
             if (workingSessions >= 2) workLeftNow = sessionMinutesLeft / workingSessions;
@@ -126,7 +139,8 @@ public sealed class PaceTracker
         else
         {
             if (dT <= 0) return PaceEstimate.Learning;
-            workLeft = left / (dU / dT);
+            var sinceStart = ((now > cur.At ? now : cur.At) - start.At).TotalMinutes;
+            workLeft = MinutesLeft(cur.Utilization, dU, (moved.At - start.At).TotalMinutes, sinceStart);
             available = toReset;
             basis = PaceBasis.Clock;
             span = dT;
@@ -134,6 +148,20 @@ public sealed class PaceTracker
 
         var verdict = available is { } a && workLeft < a ? PaceVerdict.RunsOutFirst : PaceVerdict.Lasts;
         return new PaceEstimate(verdict, Minutes(workLeft), workLeftNow is { } n ? Minutes(n) : null, workingSessions, Minutes(span), basis);
+    }
+
+    /// <summary>
+    /// Time left at the rate the limit rose by <paramref name="rise"/> points. The reading moves in whole points, so the rate
+    /// runs to where it last moved and the time since then is progress towards the next point; measuring to the latest
+    /// reading instead would sag between points and flip the answer back and forth near the reset. A next point that is
+    /// overdue lowers the rate, so a pause still slows it.
+    /// </summary>
+    private static double MinutesLeft(double utilization, double rise, double toMoved, double toNow)
+    {
+        var rate = (rise + 1) / toNow;
+        if (toMoved > 0) rate = Math.Min(rate, rise / toMoved);
+        var used = utilization + Math.Clamp(rate * (toNow - toMoved), 0, 1);
+        return (100 - used) / rate;
     }
 
     public PaceState Export() => Copy(_state);

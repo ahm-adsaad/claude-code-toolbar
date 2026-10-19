@@ -190,6 +190,18 @@ public class SessionTrackerTests
     }
 
     [Fact]
+    public void Prune_DropsSessionsWhoseClaudeCodeIsGone()
+    {
+        var t = new SessionTracker();
+        t.Apply(Ev(SessionEventKind.PromptSubmitted, id: "closed"), T0, new SessionHost(70, "Windows Terminal", T0, ClientPid: 111, ClientStart: T0));
+        t.Apply(Ev(SessionEventKind.PromptSubmitted, id: "open"), T0, new SessionHost(70, "Windows Terminal", T0, ClientPid: 222, ClientStart: T0));
+        t.Apply(Ev(SessionEventKind.PromptSubmitted, id: "unknown"), T0);
+        t.Prune(T0.AddMinutes(1), host => host.ClientPid == 111);
+        Assert.Equal(["open", "unknown"], t.Sessions.Select(s => s.Id).Order());
+        Assert.Equal(2, t.WorkingCount);
+    }
+
+    [Fact]
     public void PruneDropsStaleSessions()
     {
         var t = new SessionTracker();

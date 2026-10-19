@@ -135,6 +135,46 @@ public class PaceTrackerTests
     }
 
     [Fact]
+    public void Suspend_TickBeforeSleep_DoesNotRestartTheClock()
+    {
+        var t = new PaceTracker();
+        t.Advance(1, T0);
+        t.Suspend(T0.AddMinutes(10));
+        t.Advance(1, T0.AddMinutes(10).AddSeconds(1));
+        t.Advance(1, T0.AddHours(8));
+        Assert.Equal(10, t.Export().WorkMinutes);
+    }
+
+    [Fact]
+    public void CancelledSleep_CountsAgainAfterAMinute()
+    {
+        var t = new PaceTracker();
+        t.Advance(1, T0);
+        t.Suspend(T0.AddMinutes(10));
+        t.Advance(1, T0.AddMinutes(11));
+        t.Advance(1, T0.AddMinutes(21));
+        Assert.Equal(20, t.Export().WorkMinutes);
+    }
+
+    [Fact]
+    public void SteadyUse_NearTheReset_DoesNotFlicker()
+    {
+        // A point every 4 minutes of steady work, read every minute: at this pace the limit runs out 10 minutes before
+        // the reset, and the answer should say so at every reading and between them.
+        var t = new PaceTracker();
+        var resets = T0.AddMinutes(370);
+        for (var m = 0; m <= 120; m++)
+        {
+            var at = T0.AddMinutes(m);
+            t.Record(Five(10 + m / 4, at, resets), 1);
+            if (m >= 40) Assert.Equal((m, PaceVerdict.RunsOutFirst), (m, t.Estimate(UsageLimit.FiveHour, at, 1).Verdict));
+            var between = at.AddSeconds(30);
+            t.Advance(1, between);
+            if (m >= 40) Assert.Equal((m, PaceVerdict.RunsOutFirst), (m, t.Estimate(UsageLimit.FiveHour, between, 1).Verdict));
+        }
+    }
+
+    [Fact]
     public void ClockGoingBackwards_AddsNothing()
     {
         var t = new PaceTracker();

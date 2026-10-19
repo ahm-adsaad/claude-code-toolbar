@@ -25,6 +25,11 @@ enum ProcessTable {
         return table
     }
 
+    /// True once the Claude Code process behind a host has exited; false when that process was never known.
+    static func clientIsGone(_ host: SessionHost) -> Bool {
+        host.clientPid > 0 && host.clientStart != 0 && cproc_start_time(pid_t(host.clientPid)) != host.clientStart
+    }
+
     static func shortName(_ pid: pid_t) -> String {
         var buffer = [CChar](repeating: 0, count: 64)
         let length = cproc_name(pid, &buffer, Int32(buffer.count))

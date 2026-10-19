@@ -460,7 +460,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         advancePace()
         if Date().timeIntervalSince(lastPrune) > 60 {
             lastPrune = Date()
-            sessions.prune(now: Date())
+            // A terminal closed mid-turn sends no hook at all; without this its session would count as working for hours.
+            sessions.prune(now: Date(), isGone: ProcessTable.clientIsGone)
             advancePace()
             controller.badge = sessions.badge
             // A pruned session must not leave a summary or a "Click Clawd to go to …" line

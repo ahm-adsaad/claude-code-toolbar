@@ -163,6 +163,16 @@ final class SessionTrackerTests: XCTestCase {
         XCTAssertEqual(t.badge, .working)
     }
 
+    func testPruneDropsSessionsWhoseClaudeCodeIsGone() {
+        let t = SessionTracker()
+        _ = t.apply(ev(.promptSubmitted, id: "closed"), now: t0, host: SessionHost(pid: 70, name: "Terminal", resolvedAt: t0, clientPid: 111, clientStart: 5))
+        _ = t.apply(ev(.promptSubmitted, id: "open"), now: t0, host: SessionHost(pid: 70, name: "Terminal", resolvedAt: t0, clientPid: 222, clientStart: 5))
+        _ = t.apply(ev(.promptSubmitted, id: "unknown"), now: t0)
+        t.prune(now: t0.addingTimeInterval(60), isGone: { $0.clientPid == 111 })
+        XCTAssertEqual(t.sessions.map(\.id).sorted(), ["open", "unknown"])
+        XCTAssertEqual(t.workingCount, 2)
+    }
+
     func testPruneDropsStaleSessions() {
         let t = SessionTracker()
         _ = t.apply(ev(.promptSubmitted, id: "old"), now: t0)
