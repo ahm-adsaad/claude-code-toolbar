@@ -94,6 +94,12 @@ struct PopoverView: View {
                                 .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
                         }
+                        ForEach(Array(row.paceLines.enumerated()), id: \.offset) { _, line in
+                            Text(line.text)
+                                .font(.system(size: 11))
+                                .foregroundStyle(line.tint.map { colors.color(for: $0) } ?? Color.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                 }
                 VStack(alignment: .leading, spacing: 2) {

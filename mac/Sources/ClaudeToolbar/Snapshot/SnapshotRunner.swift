@@ -21,8 +21,9 @@ enum SnapshotRunner {
         }
         let defaults = SettingsValidator.normalize(AppSettings.createDefault())
 
-        func model(_ status: UsageStatus, settings: AppSettings = defaults, snapshot: UsageSnapshot? = SampleData.snapshot) -> StatusItemModel {
-            StatusItemModelBuilder.build(state: SampleData.state(status, snapshot: snapshot), settings: settings, now: SampleData.now)
+        func model(_ status: UsageStatus, settings: AppSettings = defaults, snapshot: UsageSnapshot? = SampleData.snapshot,
+                   pace: [UsageLimit: PaceEstimate] = [:]) -> StatusItemModel {
+            StatusItemModelBuilder.build(state: SampleData.state(status, snapshot: snapshot), settings: settings, now: SampleData.now, pace: pace)
         }
 
         func write(_ name: String, _ model: StatusItemModel, settings: AppSettings, dark isDark: Bool,
@@ -63,6 +64,10 @@ enum SnapshotRunner {
         try write("statusitem-badge-finished-light.png", model(.ok), settings: defaults, dark: false, badge: .finished)
         try write("statusitem-badge-failed-dark.png", model(.ok), settings: defaults, dark: true, badge: .failed)
 
+        // Time is hidden by default; the pace warning shows anyway.
+        try write("statusitem-pace-dark.png", model(.ok, snapshot: SampleData.paceSnapshot, pace: SampleData.pace), settings: defaults, dark: true)
+        try write("statusitem-pace-light.png", model(.ok, snapshot: SampleData.paceSnapshot, pace: SampleData.pace), settings: defaults, dark: false)
+
         var noMascot = defaults
         noMascot.behavior.mascot = MascotMode.off
         try write("statusitem-nomascot-dark.png", model(.ok, settings: noMascot), settings: noMascot, dark: true)
@@ -78,8 +83,10 @@ enum SnapshotRunner {
             return f.string(from: date)
         }
 
-        func view(_ status: UsageStatus, snapshot: UsageSnapshot? = SampleData.snapshot, sessions: [SessionEntry] = [], hint: String? = nil) -> some View {
-            let model = PopoverModelBuilder.build(state: SampleData.state(status, snapshot: snapshot), settings: defaults, now: SampleData.now, formatClock: clock)
+        func view(_ status: UsageStatus, snapshot: UsageSnapshot? = SampleData.snapshot, sessions: [SessionEntry] = [], hint: String? = nil,
+                  pace: [UsageLimit: PaceEstimate] = [:]) -> some View {
+            let model = PopoverModelBuilder.build(state: SampleData.state(status, snapshot: snapshot), settings: defaults, now: SampleData.now,
+                                                  formatClock: clock, pace: pace)
             return PopoverView(model: model, colors: BarColors(settings: defaults), sessions: sessions, hint: hint,
                                launchAtLogin: .constant(true),
                                onRefresh: {}, onSettings: {}, onQuit: {})
@@ -89,6 +96,8 @@ enum SnapshotRunner {
         try ViewSnapshot.write(try ViewSnapshot.pngData(view: view(.ok), appearance: .aqua), to: directory, name: "popover-light.png")
         try ViewSnapshot.write(try ViewSnapshot.pngData(view: view(.ok), appearance: .darkAqua), to: directory, name: "popover-dark.png")
         try ViewSnapshot.write(try ViewSnapshot.pngData(view: view(.ok, snapshot: SampleData.fullSnapshot), appearance: .darkAqua), to: directory, name: "popover-all-dark.png")
+        try ViewSnapshot.write(try ViewSnapshot.pngData(view: view(.ok, snapshot: SampleData.paceSnapshot, pace: SampleData.pace), appearance: .darkAqua),
+                               to: directory, name: "popover-pace-dark.png")
         try ViewSnapshot.write(try ViewSnapshot.pngData(view: view(.stale), appearance: .darkAqua), to: directory, name: "popover-stale-dark.png")
         try ViewSnapshot.write(try ViewSnapshot.pngData(view: view(.expired), appearance: .darkAqua), to: directory, name: "popover-expired-dark.png")
         try ViewSnapshot.write(try ViewSnapshot.pngData(view: view(.noCredentials, snapshot: nil), appearance: .darkAqua), to: directory, name: "popover-nocreds-dark.png")

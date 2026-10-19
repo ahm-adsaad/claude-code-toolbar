@@ -94,7 +94,10 @@ enum StatusItemRenderer {
                 }
                 if style.showPercent { rowParts.append(.text(attributed(row.percentText, color: textColor))) }
                 let hintHere = index == 0 && model.hint != nil
-                if style.showTime && !row.timeText.isEmpty && !hintHere {
+                if let warning = row.warning, !hintHere {
+                    // The pace warning takes the time's place and shows even when the time is hidden.
+                    rowParts.append(.text(attributed(warning, color: style.color(for: row.warningLevel))))
+                } else if style.showTime && !row.timeText.isEmpty && !hintHere {
                     rowParts.append(.text(attributed(row.timeText, color: textColor)))
                 }
                 if hintHere, let hint = model.hint {

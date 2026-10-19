@@ -19,6 +19,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hookListener: HookListener?
     private var chime: ChimePlayer?
     private var lastPrune = Date()
+    private let paceStore = PaceStore(path: PaceStore.defaultPath())
+    private var pace = PaceTracker()
+    private var paceRecordedAt: Date?
+    private var paceSavedAt = Date.distantPast
+    private static let paceSaveEvery: TimeInterval = 5 * 60
+    /// Read when the popover opens: checking the Claude Code settings file every second would hit the disk for nothing.
+    private var hooksInstalled = false
     /// What the listener was last asked for, so a failed bind is not retried on every settings change.
     private var listenerEnabled: Bool?
     private var listenerPort: Int?
@@ -59,6 +66,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         settingsStore = SettingsStore(path: SettingsStore.defaultPath())
         settings = settingsStore.load()
+        if let restored = paceStore.load() {
+            pace = PaceTracker(restored: restored)
+            Log.info("Pace: restored \(restored.limits.count) limits")
+        } else {
+            Log.info("Pace: starting fresh")
+        }
+        advancePace()
 
         let clock = SystemClock()
         let credentials = CompositeCredentialsSource([
@@ -133,7 +147,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         controller.onStateChanged = { [weak self] state in
             self?.settingsModel?.account = state
+            self?.recordPace(state)
         }
+        controller.paceEstimates = { [weak self] in self?.paceEstimates() ?? [:] }
         controller.beforeRender = { [weak self] in self?.tickSessions() }
 
         chime = ChimePlayer()
@@ -153,10 +169,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hookListener = listener
         applyListenerSettings()
 
-        wakeObserver = WakeObserver { [weak self] in
+        wakeObserver = WakeObserver(onSleep: { [weak self] at in
+            Log.info("Going to sleep")
+            // Sessions cannot work while the Mac sleeps; without this the gap would count as working time.
+            self?.pace.suspend(now: at)
+            self?.savePace(force: true)
+        }, onWake: { [weak self] in
             Log.info("Woke from sleep")
             self?.controller.requestRefresh()
-        }
+        })
         // Hook events and chimes keep working while paused; only the tick and usage polling stop.
         visibilityObserver = VisibilityObserver { [weak self] visible in
             self?.controller.setPaused(!visible)
@@ -185,6 +206,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         settingsModel?.flushPendingSave()
+        advancePace()
+        savePace(force: true)
         testSessionWork?.cancel()
         jumpHintWork?.cancel()
         hookListener?.stop()
@@ -199,6 +222,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func togglePopover() {
         guard let button = controller.button else { return }
+        if !popover.isShown { hooksInstalled = HooksInstaller.isInstalled(url: hookUrl) }
         updatePopover()
         popover.toggle(relativeTo: button)
     }
@@ -214,7 +238,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func popoverModel() -> PopoverModel {
-        PopoverModelBuilder.build(state: controller.state, settings: settings, now: Date(), formatClock: Self.formatClock)
+        PopoverModelBuilder.build(state: controller.state, settings: settings, now: Date(), formatClock: Self.formatClock,
+                                  pace: paceEstimates(), hooksInstalled: hooksInstalled)
+    }
+
+    /// Counts working time up to now. Called whenever the number of working sessions may have changed, and every tick.
+    private func advancePace() {
+        pace.advance(workingSessions: sessions.workingCount, now: Date())
+    }
+
+    private func recordPace(_ state: MonitorState) {
+        guard state.status == .ok, let snapshot = state.snapshot, snapshot.fetchedAt != paceRecordedAt else { return }
+        paceRecordedAt = snapshot.fetchedAt
+        pace.record(snapshot, workingSessions: sessions.workingCount)
+        savePace()
+    }
+
+    private func savePace(force: Bool = false) {
+        guard force || Date().timeIntervalSince(paceSavedAt) >= Self.paceSaveEvery else { return }
+        paceSavedAt = Date()
+        do {
+            try paceStore.save(pace.export())
+        } catch {
+            Log.error("Saving pace failed: \(error)")
+        }
+    }
+
+    /// An estimate for each limit the current snapshot reports.
+    private func paceEstimates() -> [UsageLimit: PaceEstimate] {
+        guard let snapshot = controller?.state.snapshot else { return [:] }
+        let working = sessions.workingCount
+        let now = Date()
+        var estimates: [UsageLimit: PaceEstimate] = [:]
+        for limit in UsageLimit.allCases where snapshot.window(limit) != nil {
+            estimates[limit] = pace.estimate(limit, now: now, workingSessions: working)
+        }
+        return estimates
     }
 
     static func formatClock(_ date: Date) -> String {
@@ -308,6 +367,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func handleHook(_ body: String, host: SessionHost?) {
         guard let event = HookEventParser.parse(body) else { return }
         let cue = sessions.apply(event, now: Date(), host: host)
+        advancePace()
         Log.info("Session \(event.sessionId.prefix(8)): \(event.kind)\(cue.map { " \u{2192} \($0)" } ?? "")")
         if let cue {
             if settings.notifications.sound { chime?.play(Self.chimeKind(cue)) }
@@ -397,9 +457,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Once a second, from the status item's own tick: blink the attention badge and prune stale sessions.
     private func tickSessions() {
         controller.badgeLit = controller.badge != .attention || Int(Date().timeIntervalSince1970) % 2 == 0
+        advancePace()
         if Date().timeIntervalSince(lastPrune) > 60 {
             lastPrune = Date()
             sessions.prune(now: Date())
+            advancePace()
             controller.badge = sessions.badge
             // A pruned session must not leave a summary or a "Click Clawd to go to …" line
             // pointing at a session that is no longer there.
@@ -412,6 +474,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func acknowledgeSessions() {
         guard sessions.badge != .none else { return }
         sessions.acknowledge()
+        advancePace()
         refreshSessionUi()
     }
 

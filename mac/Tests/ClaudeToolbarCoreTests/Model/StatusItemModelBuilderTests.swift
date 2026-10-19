@@ -93,6 +93,48 @@ final class StatusItemModelBuilderTests: XCTestCase {
         XCTAssertEqual(m.rows[0].level, .warn)
     }
 
+    private func withFable(_ status: UsageStatus = .ok) -> MonitorState {
+        let s = snapshot
+        let snap = UsageSnapshot(fiveHour: s.fiveHour, sevenDay: s.sevenDay, sevenDayOpus: s.sevenDayOpus, sevenDaySonnet: nil,
+                                 sevenDayFable: UsageWindow(utilization: 72, resetsAt: now.addingTimeInterval(3 * 86_400)), fetchedAt: now)
+        return state(status, snapshot: snap)
+    }
+
+    private func pace(_ limit: UsageLimit, _ verdict: PaceVerdict, _ workLeft: TimeInterval) -> [UsageLimit: PaceEstimate] {
+        [limit: PaceEstimate(verdict: verdict, workLeft: workLeft, workLeftNow: nil, sessionsNow: 1, span: 9 * 3600, basis: .work)]
+    }
+
+    func testWarningWhenRunsOutFirst() {
+        let m = StatusItemModelBuilder.build(state: withFable(), settings: .createDefault(), now: now, pace: pace(.sevenDayFable, .runsOutFirst, 6 * 3600 + 12 * 60))
+        XCTAssertEqual(m.rows.last?.warning, "~6h work")
+        XCTAssertEqual(m.rows.last?.warningLevel, .warn)
+        XCTAssertEqual(m.rows.last?.timeText, "3d 0h")
+        XCTAssertNil(m.rows[0].warning)
+    }
+
+    func testWarningCriticalUnderThirtyMinutes() {
+        let m = StatusItemModelBuilder.build(state: withFable(), settings: .createDefault(), now: now, pace: pace(.fiveHour, .runsOutFirst, 20 * 60))
+        XCTAssertEqual(m.rows[0].warning, "~20m work")
+        XCTAssertEqual(m.rows[0].warningLevel, .crit)
+    }
+
+    func testNoWarningWhenItLasts() {
+        let m = StatusItemModelBuilder.build(state: withFable(), settings: .createDefault(), now: now, pace: pace(.sevenDayFable, .lasts, 90 * 3600))
+        XCTAssertNil(m.rows.last?.warning)
+    }
+
+    func testNoWarningWhenLoginExpired() {
+        let m = StatusItemModelBuilder.build(state: withFable(.expired), settings: .createDefault(), now: now, pace: pace(.sevenDayFable, .runsOutFirst, 6 * 3600))
+        XCTAssertNil(m.rows.last?.warning)
+    }
+
+    func testWarningShowsWhenTimeIsHidden() {
+        var s = AppSettings.createDefault()
+        s.rows.showTime = false
+        let m = StatusItemModelBuilder.build(state: withFable(), settings: s, now: now, pace: pace(.sevenDayFable, .runsOutFirst, 6 * 3600))
+        XCTAssertEqual(m.rows.last?.warning, "~6h work")
+    }
+
     func testFableRowHiddenWhenApiHasNone() {
         var s = AppSettings.createDefault()
         s.rows.showSevenDaySonnet = true

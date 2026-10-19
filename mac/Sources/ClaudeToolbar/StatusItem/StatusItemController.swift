@@ -82,6 +82,8 @@ final class StatusItemController {
     var onMascotClick: (() -> Void)?
     var onRightClick: (() -> Void)?
     var onStateChanged: ((MonitorState) -> Void)?
+    /// How long each limit will keep going at the user's pace; the warnings in the menu bar come from it.
+    var paceEstimates: (() -> [UsageLimit: PaceEstimate])?
     /// Called after every re-render (once a second) so other views can refresh countdowns.
     var onRender: (() -> Void)?
     /// Called at the top of every re-render (once a second) so the host can update the badge before it is drawn.
@@ -181,7 +183,7 @@ final class StatusItemController {
             let detail = newState.message.map { " (\($0))" } ?? ""
             Log.info("Usage state: \(newState.status)\(detail)")
         }
-        let model = StatusItemModelBuilder.build(state: newState, settings: settings, now: clock.now)
+        let model = StatusItemModelBuilder.build(state: newState, settings: settings, now: clock.now, pace: paceEstimates?() ?? [:])
         if let cue = cues.observe(TrackedRows.from(model, snapshot: newState.snapshot)) { _ = startWave(cue) }
         // Only spend the greeting when the wave really starts: a refused one (hover-only or off
         // mode, reduce motion) would otherwise mean the user never sees it.
@@ -203,7 +205,7 @@ final class StatusItemController {
     /// Repaints the menu bar image only. Wave frames use this so a wave does not rebuild the popover 18 times.
     private func renderButton() {
         guard let button = statusItem.button else { return }
-        let model = StatusItemModelBuilder.build(state: state, settings: settings, now: clock.now)
+        let model = StatusItemModelBuilder.build(state: state, settings: settings, now: clock.now, pace: paceEstimates?() ?? [:])
         let mascot = MascotModelBuilder.build(status: model, mascotMode: settings.behavior.mascot,
                                               armAngle: currentArmAngle(), badge: badge, badgeLit: badgeLit)
         mascotShown = mascot.visible && model.notice == nil

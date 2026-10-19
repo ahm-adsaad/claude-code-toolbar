@@ -27,6 +27,23 @@ enum SampleData {
             fetchedAt: now.addingTimeInterval(-12))
     }
 
+    /// The usual sample with a Fable limit that runs out before its reset at the sample pace.
+    static var paceSnapshot: UsageSnapshot {
+        UsageSnapshot(
+            fiveHour: UsageWindow(utilization: 42, resetsAt: now.addingTimeInterval(2 * 3600 + 13 * 60)),
+            sevenDay: UsageWindow(utilization: 18, resetsAt: now.addingTimeInterval(3 * 86_400 + 4 * 3600)),
+            sevenDayOpus: nil,
+            sevenDaySonnet: nil,
+            sevenDayFable: UsageWindow(utilization: 72, resetsAt: now.addingTimeInterval(3 * 86_400 + 4 * 3600)),
+            fetchedAt: now.addingTimeInterval(-12))
+    }
+
+    /// The 5-hour limit lasts and Fable runs out first, so the snapshots and the settings preview show both kinds.
+    static let pace: [UsageLimit: PaceEstimate] = [
+        .fiveHour: PaceEstimate(verdict: .lasts, workLeft: 9 * 3600, workLeftNow: nil, sessionsNow: 1, span: 2 * 3600, basis: .work),
+        .sevenDayFable: PaceEstimate(verdict: .runsOutFirst, workLeft: 6 * 3600, workLeftNow: nil, sessionsNow: 1, span: 9 * 3600, basis: .work),
+    ]
+
     static func state(_ status: UsageStatus, snapshot: UsageSnapshot? = SampleData.snapshot) -> MonitorState {
         switch status {
         case .ok:

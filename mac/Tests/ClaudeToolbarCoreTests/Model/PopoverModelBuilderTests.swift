@@ -30,6 +30,64 @@ final class PopoverModelBuilderTests: XCTestCase {
         XCTAssertEqual(m.statusText, "OK")
     }
 
+    private func fableState(_ status: UsageStatus = .ok) -> MonitorState {
+        let snap = UsageSnapshot(fiveHour: UsageWindow(utilization: 42, resetsAt: now.addingTimeInterval(2 * 3600)), sevenDay: nil, sevenDayOpus: nil, sevenDaySonnet: nil,
+                                 sevenDayFable: UsageWindow(utilization: 72, resetsAt: now.addingTimeInterval(3 * 86_400)), fetchedAt: now)
+        return MonitorState(status: status, snapshot: snap, lastSuccess: now, message: nil, credentials: creds)
+    }
+
+    private let runsOut = PaceEstimate(verdict: .runsOutFirst, workLeft: 6 * 3600, workLeftNow: nil, sessionsNow: 1, span: 9 * 3600, basis: .work)
+
+    private func with(_ e: PaceEstimate, verdict: PaceVerdict? = nil, workLeftNow: TimeInterval? = nil, sessionsNow: Int? = nil, span: TimeInterval? = nil, basis: PaceBasis? = nil) -> PaceEstimate {
+        PaceEstimate(verdict: verdict ?? e.verdict, workLeft: e.workLeft, workLeftNow: workLeftNow ?? e.workLeftNow, sessionsNow: sessionsNow ?? e.sessionsNow,
+                     span: span ?? e.span, basis: basis ?? e.basis)
+    }
+
+    private func fableLines(_ e: PaceEstimate, status: UsageStatus = .ok, hooksInstalled: Bool = true) -> [PaceLine] {
+        let m = PopoverModelBuilder.build(state: fableState(status), settings: .createDefault(), now: now, formatClock: clock,
+                                          pace: [.sevenDayFable: e], hooksInstalled: hooksInstalled)
+        XCTAssertEqual(m.rows.last?.name, "Weekly Fable")
+        XCTAssertEqual(m.rows.first?.paceLines, [])
+        return m.rows.last?.paceLines ?? []
+    }
+
+    func testPaceRunsOutFirstAddsAWarningAndItsBasis() {
+        XCTAssertEqual(fableLines(runsOut), [
+            PaceLine(text: "At your pace: about 6h of work left, runs out before the reset", tint: .warn),
+            PaceLine(text: "Based on your last 9 hours of work", tint: nil),
+        ])
+    }
+
+    func testPaceLasts() {
+        XCTAssertEqual(fableLines(with(runsOut, verdict: .lasts)).map(\.text), ["At your pace this lasts until the reset", "Based on your last 9 hours of work"])
+    }
+
+    func testPaceLearningHasNoBasisLine() {
+        XCTAssertEqual(fableLines(.learning), [PaceLine(text: "Learning your pace", tint: nil)])
+    }
+
+    func testPaceUsedUpAddsNothing() {
+        XCTAssertEqual(fableLines(with(runsOut, verdict: .usedUp)), [])
+    }
+
+    func testPaceWithSeveralSessionsRunning() {
+        XCTAssertEqual(fableLines(with(runsOut, workLeftNow: 40 * 60, sessionsNow: 3)).map(\.text), [
+            "At your pace: about 6h of work left, runs out before the reset",
+            "With 3 sessions running: about 40m",
+            "Based on your last 9 hours of work",
+        ])
+    }
+
+    func testPaceClockBasis() {
+        let e = with(runsOut, span: 3600, basis: .clock)
+        XCTAssertEqual(fableLines(e, hooksInstalled: false).last?.text, "Based on clock time over the last 1 hour; install the hooks for a better estimate")
+        XCTAssertEqual(fableLines(e, hooksInstalled: true).last?.text, "Based on clock time over the last 1 hour")
+    }
+
+    func testPaceNothingWhenLoginExpired() {
+        XCTAssertEqual(fableLines(runsOut, status: .expired), [])
+    }
+
     func testStatusTexts() {
         func text(_ status: UsageStatus, message: String? = nil) -> String {
             PopoverModelBuilder.build(state: MonitorState(status: status, snapshot: nil, lastSuccess: nil, message: message, credentials: creds),

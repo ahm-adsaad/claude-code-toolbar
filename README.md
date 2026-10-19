@@ -17,7 +17,7 @@ Claude Toolbar has no login of its own. It reads the credentials Claude Code sav
 
 The rows, thresholds and refresh interval are the same on both platforms:
 
-- Rows: the 5-hour session window and the 7-day weekly window, plus optional rows for the per-model weekly limits (Opus, Sonnet and Fable) on plans that report them. On Windows the Fable row is on by default and stays hidden on plans without a Fable limit.
+- Rows: the 5-hour session window and the 7-day weekly window, plus optional rows for the per-model weekly limits (Opus, Sonnet and Fable) on plans that report them. The Fable row is on by default and stays hidden on plans without a Fable limit; on the Mac the default applies to fresh installs, and an existing settings file keeps its choice.
 - Bars change colour from OK to warning to critical at thresholds you choose (defaults 70 % and 90 %).
 - Refresh every 30 to 300 seconds (default 60), with an immediate refresh after sleep, when the network comes back, and when a window resets.
 
@@ -29,7 +29,7 @@ Clawd, the Claude Code mascot, sits at the left of the rows as pixel art. He wav
 
 The percentages say how much of each limit is used, not whether it will last until it resets. The toolbar learns that from your own pace: it counts the time Claude Code sessions spend working, from the session hooks below (two sessions working for ten minutes count as twenty), and how much each limit rises over that time, so breaks and idle time don't count against you. When a limit would run out before it resets at that pace, its time column shows the working time left instead of the countdown, for example `~6h work` in the warning colour (the critical colour under 30 minutes). The warning shows even with "Show time" off, and goes away once the limit would last.
 
-Hovering explains it, under each limit: `At your pace: about 6h of work left, runs out before the reset` or `At your pace this lasts until the reset`, the figure for the sessions running right now when there are two or more, and how much work the figure is based on (`Based on your last 9 hours of work`). Until a limit has risen by 3 points the hover says `Learning your pace` and nothing else changes; after a reset the limit starts learning again. Without the hooks there is no working time, so the pace is measured against the clock and the hover says so. Usage from elsewhere (claude.ai, another computer) makes your pace look faster than it is, so the warning errs on the early side. What the toolbar has learned is kept in `%LOCALAPPDATA%\ClaudeToolbar\pace.json`; deleting the file only restarts the learning. The Mac app does not have this yet.
+Hovering explains it, under each limit: `At your pace: about 6h of work left, runs out before the reset` or `At your pace this lasts until the reset`, the figure for the sessions running right now when there are two or more, and how much work the figure is based on (`Based on your last 9 hours of work`). Until a limit has risen by 3 points the hover says `Learning your pace` and nothing else changes; after a reset the limit starts learning again. Without the hooks there is no working time, so the pace is measured against the clock and the hover says so. Usage from elsewhere (claude.ai, another computer) makes your pace look faster than it is, so the warning errs on the early side. What the toolbar has learned is kept in `%LOCALAPPDATA%\ClaudeToolbar\pace.json` on Windows and `~/Library/Application Support/ClaudeToolbar/pace.json` on the Mac; deleting the file only restarts the learning. On the Mac the hover lines are in the popover, under each limit, and the menu bar item grows to show `~6h work` only while a warning is showing.
 
 ## Session notifications (both platforms)
 
@@ -119,7 +119,7 @@ dotnet publish src/ClaudeToolbar.App -c Release -r win-x64 --self-contained -p:P
 5h ▬▬▬▬▬▬▬▬ 42%   7d ▬▬▬▬▬▬▬▬ 18%
 ```
 
-One line in the menu bar with compact bars and percentages (reset times can be added in Settings). Click it (away from Clawd) for the full detail: each window with its bar, reset countdown and clock time, the last update time and the account state, plus Refresh now, Settings, a Launch at login switch and Quit. Right-click (or Control-click) for the same actions as a menu.
+One line in the menu bar with compact bars and percentages (reset times can be added in Settings). When a limit would run out before it resets at your pace, `~6h work` follows its percentage in the warning colour, even with reset times hidden (see [How long it'll keep going](#how-long-itll-keep-going)). Click it (away from Clawd) for the full detail: each window with its bar, reset countdown and clock time, the last update time and the account state, how long each limit will keep going at your pace, plus Refresh now, Settings, a Launch at login switch and Quit. Right-click (or Control-click) for the same actions as a menu.
 
 ### How it signs in
 
