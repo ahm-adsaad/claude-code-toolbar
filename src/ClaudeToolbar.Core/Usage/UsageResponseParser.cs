@@ -31,10 +31,35 @@ public static class UsageResponseParser
                 ReadWindow(root, "seven_day"),
                 ReadWindow(root, "seven_day_opus"),
                 ReadWindow(root, "seven_day_sonnet"),
+                ReadWindow(root, "seven_day_fable") ?? ReadScopedWeekly(root, "Fable"),
                 fetchedAt);
             return new UsageResult.Ok(snapshot);
         }
     }
+
+    /// <summary>
+    /// Newer models have no <c>seven_day_&lt;model&gt;</c> field: their weekly limit is a <c>weekly_scoped</c> entry in
+    /// <c>limits</c>, named by <c>scope.model.display_name</c>.
+    /// </summary>
+    private static UsageWindow? ReadScopedWeekly(JsonElement root, string model)
+    {
+        if (!root.TryGetProperty("limits", out var limits) || limits.ValueKind != JsonValueKind.Array)
+            return null;
+        foreach (var limit in limits.EnumerateArray())
+        {
+            if (Str(limit, "kind") != "weekly_scoped") continue;
+            if (!string.Equals(Str(Obj(Obj(limit, "scope"), "model"), "display_name"), model, StringComparison.OrdinalIgnoreCase)) continue;
+            if (!limit.TryGetProperty("percent", out var p) || p.ValueKind != JsonValueKind.Number || !p.TryGetDouble(out var raw)) continue;
+            return new UsageWindow(Math.Clamp(raw, 0, 100), ReadResetsAt(limit));
+        }
+        return null;
+    }
+
+    private static JsonElement? Obj(JsonElement? el, string name) =>
+        el is { ValueKind: JsonValueKind.Object } e && e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Object ? v : null;
+
+    private static string? Str(JsonElement? el, string name) =>
+        el is { ValueKind: JsonValueKind.Object } e && e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
 
     private static UsageWindow? ReadWindow(JsonElement root, string name)
     {
@@ -43,13 +68,12 @@ public static class UsageResponseParser
         if (!el.TryGetProperty("utilization", out var u) || u.ValueKind != JsonValueKind.Number || !u.TryGetDouble(out var raw))
             return null;
 
-        DateTimeOffset? resetsAt = null;
-        if (el.TryGetProperty("resets_at", out var r) && r.ValueKind == JsonValueKind.String &&
-            DateTimeOffset.TryParse(r.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed))
-        {
-            resetsAt = parsed;
-        }
-
-        return new UsageWindow(Math.Clamp(raw, 0, 100), resetsAt);
+        return new UsageWindow(Math.Clamp(raw, 0, 100), ReadResetsAt(el));
     }
+
+    private static DateTimeOffset? ReadResetsAt(JsonElement el) =>
+        el.TryGetProperty("resets_at", out var r) && r.ValueKind == JsonValueKind.String &&
+        DateTimeOffset.TryParse(r.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed)
+            ? parsed
+            : null;
 }

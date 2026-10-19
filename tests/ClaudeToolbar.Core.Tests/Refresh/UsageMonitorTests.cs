@@ -27,7 +27,7 @@ public class UsageMonitorTests
         new(@"C:\fake\.credentials.json", "tok", now.AddHours(7), "max");
 
     private static UsageSnapshot Snapshot(DateTimeOffset now, double five = 42, double seven = 18) =>
-        new(new UsageWindow(five, now.AddHours(2)), new UsageWindow(seven, now.AddDays(3)), null, null, now);
+        new(new UsageWindow(five, now.AddHours(2)), new UsageWindow(seven, now.AddDays(3)), null, null, null, now);
 
     [Fact]
     public async Task MissingCredentialsPausesWithNoCredentials()
@@ -121,7 +121,7 @@ public class UsageMonitorTests
     public async Task PassedResetTriggersOneImmediateRefresh()
     {
         _creds.State = ValidCreds(T0);
-        var snap = new UsageSnapshot(new UsageWindow(42, T0.AddSeconds(10)), null, null, null, T0);
+        var snap = new UsageSnapshot(new UsageWindow(42, T0.AddSeconds(10)), null, null, null, null, T0);
         _client.Results.Enqueue(new UsageResult.Ok(snap));
         await _monitor.TickAsync(CancellationToken.None);
         Assert.Equal(T0.AddSeconds(11), _scheduler.NextDue);

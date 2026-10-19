@@ -17,6 +17,7 @@ public class WidgetModelBuilderTests
         new UsageWindow(75, Now.AddDays(3).AddHours(4)),
         new UsageWindow(95, Now.AddDays(3)),
         null,
+        null,
         Now);
 
     [Fact]
@@ -25,8 +26,8 @@ public class WidgetModelBuilderTests
         var state = new MonitorState(UsageStatus.Ok, Snap(), Now, null, Creds);
         var m = WidgetModelBuilder.Build(state, AppSettings.CreateDefault(), Now);
         Assert.Equal(2, m.Rows.Count);
-        Assert.Equal(new WidgetRow("5h", 42, "42%", "2h 13m", BarLevel.Ok), m.Rows[0]);
-        Assert.Equal(new WidgetRow("7d", 75, "75%", "3d 4h", BarLevel.Warn), m.Rows[1]);
+        Assert.Equal(new WidgetRow(UsageLimit.FiveHour, "5h", "5h", 42, "42%", "2h 13m", BarLevel.Ok), m.Rows[0]);
+        Assert.Equal(new WidgetRow(UsageLimit.SevenDay, "7d", "7d", 75, "75%", "3d 4h", BarLevel.Warn), m.Rows[1]);
         Assert.False(m.Dimmed);
         Assert.False(m.ShowStaleDot);
         Assert.Null(m.Notice);
@@ -45,6 +46,39 @@ public class WidgetModelBuilderTests
         Assert.Equal(BarLevel.Crit, m.Rows[2].Level);
         Assert.Equal("7d Sonnet", m.Rows[3].Label);
         Assert.Equal("—", m.Rows[3].PercentText);
+    }
+
+    [Fact]
+    public void FableRow_ShownWithShortLabel()
+    {
+        var snap = Snap() with { SevenDayFable = new UsageWindow(72, Now.AddDays(3)) };
+        var m = WidgetModelBuilder.Build(new MonitorState(UsageStatus.Ok, snap, Now, null, Creds), AppSettings.CreateDefault(), Now);
+        var fable = m.Rows[^1];
+        Assert.Equal(UsageLimit.SevenDayFable, fable.Limit);
+        Assert.Equal("7d Fable", fable.Label);
+        Assert.Equal("Fa", fable.ShortLabel);
+        Assert.Equal(BarLevel.Warn, fable.Level);
+    }
+
+    [Fact]
+    public void FableRow_HiddenWhenApiHasNone()
+    {
+        var s = AppSettings.CreateDefault();
+        s.Rows.ShowSevenDaySonnet = true;
+        var m = WidgetModelBuilder.Build(new MonitorState(UsageStatus.Ok, Snap(), Now, null, Creds), s, Now);
+        Assert.DoesNotContain(m.Rows, r => r.Limit == UsageLimit.SevenDayFable);
+        Assert.Equal("—", m.Rows.Single(r => r.Limit == UsageLimit.SevenDaySonnet).PercentText);
+    }
+
+    [Fact]
+    public void ShortLabels()
+    {
+        var s = AppSettings.CreateDefault();
+        s.Rows.ShowSevenDayOpus = true;
+        s.Rows.ShowSevenDaySonnet = true;
+        var snap = Snap() with { SevenDayFable = new UsageWindow(1, null) };
+        var m = WidgetModelBuilder.Build(new MonitorState(UsageStatus.Ok, snap, Now, null, Creds), s, Now);
+        Assert.Equal(["5h", "7d", "Op", "So", "Fa"], m.Rows.Select(r => r.ShortLabel));
     }
 
     [Fact]

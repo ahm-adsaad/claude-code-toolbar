@@ -28,6 +28,7 @@ public static class FlyoutModelBuilder
             AddLine(lines, "Weekly", s.SevenDay, now, formatClock);
             AddLine(lines, "Weekly Opus", s.SevenDayOpus, now, formatClock);
             AddLine(lines, "Weekly Sonnet", s.SevenDaySonnet, now, formatClock);
+            AddLine(lines, "Weekly Fable", s.SevenDayFable, now, formatClock);
         }
         if (state.LastSuccess is { } last)
             lines.Add($"Updated {AgoFormatter.Format(now - last)} ago");

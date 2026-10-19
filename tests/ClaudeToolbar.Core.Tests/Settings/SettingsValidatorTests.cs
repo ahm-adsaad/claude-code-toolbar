@@ -21,6 +21,10 @@ public class SettingsValidatorTests
     }
 
     [Fact]
+    public void OldSettingsFile_TurnsFableOn() =>
+        Assert.True(SettingsJson.Deserialize("""{"rows":{"showFiveHour":true}}""").Rows.ShowSevenDayFable);
+
+    [Fact]
     public void ClampsRanges()
     {
         var s = AppSettings.CreateDefault();

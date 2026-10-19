@@ -5,6 +5,7 @@ public sealed record UsageSnapshot(
     UsageWindow? SevenDay,
     UsageWindow? SevenDayOpus,
     UsageWindow? SevenDaySonnet,
+    UsageWindow? SevenDayFable,
     DateTimeOffset FetchedAt)
 {
     public IEnumerable<UsageWindow> Windows
@@ -15,6 +16,7 @@ public sealed record UsageSnapshot(
             if (SevenDay is not null) yield return SevenDay;
             if (SevenDayOpus is not null) yield return SevenDayOpus;
             if (SevenDaySonnet is not null) yield return SevenDaySonnet;
+            if (SevenDayFable is not null) yield return SevenDayFable;
         }
     }
 

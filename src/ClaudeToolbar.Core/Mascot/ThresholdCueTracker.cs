@@ -9,23 +9,8 @@ public readonly record struct TrackedRow(string Key, BarLevel Level, DateTimeOff
 public static class TrackedRows
 {
     /// <summary>Pairs each visible widget row with the reset date of the window it shows, keyed by the row label.</summary>
-    public static IReadOnlyList<TrackedRow> From(WidgetModel widget, UsageSnapshot? snapshot)
-    {
-        var rows = new List<TrackedRow>(widget.Rows.Count);
-        foreach (var row in widget.Rows)
-        {
-            var window = row.Label switch
-            {
-                "5h" => snapshot?.FiveHour,
-                "7d" => snapshot?.SevenDay,
-                "7d Opus" => snapshot?.SevenDayOpus,
-                "7d Sonnet" => snapshot?.SevenDaySonnet,
-                _ => null,
-            };
-            rows.Add(new TrackedRow(row.Label, row.Level, window?.ResetsAt));
-        }
-        return rows;
-    }
+    public static IReadOnlyList<TrackedRow> From(WidgetModel widget, UsageSnapshot? snapshot) =>
+        widget.Rows.Select(row => new TrackedRow(row.Label, row.Level, snapshot?.Window(row.Limit)?.ResetsAt)).ToList();
 }
 
 /// <summary>Emits a cue when a row's level rises within the same reset period. The first observation of a key only primes it.</summary>

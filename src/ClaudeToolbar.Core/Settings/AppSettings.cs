@@ -24,6 +24,7 @@ public sealed class RowSettings
     public bool ShowSevenDay { get; set; } = true;
     public bool ShowSevenDayOpus { get; set; }
     public bool ShowSevenDaySonnet { get; set; }
+    public bool ShowSevenDayFable { get; set; } = true;
     public bool ShowLabel { get; set; } = true;
     public bool ShowBar { get; set; } = true;
     public bool ShowPercent { get; set; } = true;

@@ -19,6 +19,7 @@ public class FlyoutModelBuilderTests
             new UsageWindow(18, Now.AddDays(3).AddHours(4)),
             new UsageWindow(5, Now.AddDays(3)),
             null,
+            null,
             Now.AddSeconds(-12));
         var state = new MonitorState(UsageStatus.Ok, snap, Now.AddSeconds(-12), null, Creds);
         var f = FlyoutModelBuilder.Build(state, Now, Clock);
@@ -28,6 +29,21 @@ public class FlyoutModelBuilderTests
         Assert.Equal("Updated 12s ago", f.Lines[3]);
         Assert.Equal(4, f.Lines.Count);
         Assert.Equal("OK", f.StatusText);
+    }
+
+    [Fact]
+    public void ListsFableAfterSonnet()
+    {
+        var snap = new UsageSnapshot(
+            new UsageWindow(42, Now.AddHours(2).AddMinutes(13)),
+            null,
+            null,
+            new UsageWindow(3, Now.AddDays(2)),
+            new UsageWindow(72, Now.AddDays(3).AddHours(4)),
+            Now);
+        var f = FlyoutModelBuilder.Build(new MonitorState(UsageStatus.Ok, snap, Now, null, Creds), Now, Clock);
+        Assert.Equal("Weekly Sonnet 3% · resets in 2d 0h · at 10:00", f.Lines[1]);
+        Assert.Equal("Weekly Fable 72% · resets in 3d 4h · at 14:00", f.Lines[2]);
     }
 
     [Theory]

@@ -106,22 +106,25 @@ public class ThresholdCueTrackerTests
             new UsageWindow(18, Reset.AddDays(3)),
             new UsageWindow(75, null),
             null,
+            new UsageWindow(72, Reset.AddDays(4)),
             Reset.AddHours(-1));
         var widget = new WidgetModel(
         [
-            new WidgetRow("5h", 42, "42%", "2h", BarLevel.Ok),
-            new WidgetRow("7d", 18, "18%", "3d", BarLevel.Ok),
-            new WidgetRow("7d Opus", 75, "75%", "", BarLevel.Warn),
-            new WidgetRow("7d Sonnet", 0, "—", "", BarLevel.Ok),
+            new WidgetRow(UsageLimit.FiveHour, "5h", "5h", 42, "42%", "2h", BarLevel.Ok),
+            new WidgetRow(UsageLimit.SevenDay, "7d", "7d", 18, "18%", "3d", BarLevel.Ok),
+            new WidgetRow(UsageLimit.SevenDayOpus, "7d Opus", "Op", 75, "75%", "", BarLevel.Warn),
+            new WidgetRow(UsageLimit.SevenDaySonnet, "7d Sonnet", "So", 0, "—", "", BarLevel.Ok),
+            new WidgetRow(UsageLimit.SevenDayFable, "7d Fable", "Fa", 72, "72%", "4d", BarLevel.Warn),
         ], false, false, null);
 
         var rows = TrackedRows.From(widget, snapshot);
 
-        Assert.Equal(4, rows.Count);
+        Assert.Equal(5, rows.Count);
         Assert.Equal(new TrackedRow("5h", BarLevel.Ok, Reset), rows[0]);
         Assert.Equal(new TrackedRow("7d", BarLevel.Ok, Reset.AddDays(3)), rows[1]);
         Assert.Equal(new TrackedRow("7d Opus", BarLevel.Warn, null), rows[2]);
         Assert.Equal(new TrackedRow("7d Sonnet", BarLevel.Ok, null), rows[3]);
+        Assert.Equal(new TrackedRow("7d Fable", BarLevel.Warn, Reset.AddDays(4)), rows[4]);
         Assert.Empty(TrackedRows.From(new WidgetModel([], false, false, "x"), snapshot));
     }
 }

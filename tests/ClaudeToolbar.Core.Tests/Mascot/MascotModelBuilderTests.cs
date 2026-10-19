@@ -1,5 +1,6 @@
 using ClaudeToolbar.Core.Formatting;
 using ClaudeToolbar.Core.Mascot;
+using ClaudeToolbar.Core.Usage;
 using ClaudeToolbar.Core.Widget;
 
 namespace ClaudeToolbar.Core.Tests.Mascot;
@@ -7,7 +8,7 @@ namespace ClaudeToolbar.Core.Tests.Mascot;
 public class MascotModelBuilderTests
 {
     private static WidgetModel Widget(bool dimmed = false) =>
-        new([new WidgetRow("5h", 10, "10%", "", BarLevel.Ok)], dimmed, false, null);
+        new([new WidgetRow(UsageLimit.FiveHour, "5h", "5h", 10, "10%", "", BarLevel.Ok)], dimmed, false, null);
 
     [Fact]
     public void OffModeHidesTheMascot() =>

@@ -56,6 +56,7 @@ public partial class SettingsWindow : Window
             new UsageWindow(75, now.AddDays(3).AddHours(4)),
             new UsageWindow(93, now.AddDays(3)),
             new UsageWindow(12, now.AddDays(2)),
+            new UsageWindow(72, now.AddDays(3).AddHours(4)),
             now);
         var state = new MonitorState(UsageStatus.Ok, snapshot, now, null, new CredentialsState.Missing("preview"));
         var model = WidgetModelBuilder.Build(state, _vm.Settings, now);

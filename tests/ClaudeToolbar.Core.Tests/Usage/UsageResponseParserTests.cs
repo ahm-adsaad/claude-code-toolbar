@@ -38,6 +38,35 @@ public class UsageResponseParserTests
         Assert.Null(ok.Snapshot.SevenDaySonnet);
     }
 
+    [Fact]
+    public void Fable_ComesFromScopedWeeklyLimit()
+    {
+        const string json = """
+            {
+              "seven_day": { "utilization": 27.0, "resets_at": "2026-09-10T16:00:00+00:00" },
+              "limits": [
+                { "kind": "weekly_all", "percent": 27, "resets_at": "2026-09-10T16:00:00+00:00", "scope": null },
+                { "kind": "weekly_scoped", "percent": 8, "resets_at": "2026-09-10T16:00:00Z",
+                  "scope": { "model": { "id": null, "display_name": "Fable" }, "surface": null } }
+              ]
+            }
+            """;
+        var s = Assert.IsType<UsageResult.Ok>(UsageResponseParser.Parse(json, FetchedAt)).Snapshot;
+        Assert.Equal(8, s.SevenDayFable!.Utilization);
+        Assert.Equal(new DateTimeOffset(2026, 9, 10, 16, 0, 0, TimeSpan.Zero), s.SevenDayFable.ResetsAt);
+        Assert.Equal(27, s.SevenDay!.Utilization);
+    }
+
+    [Fact]
+    public void Fable_PrefersItsOwnFieldAndIsNullWhenAbsent()
+    {
+        const string own = """{ "seven_day_fable": { "utilization": 12 }, "limits": [ { "kind": "weekly_scoped", "percent": 8, "scope": { "model": { "display_name": "Fable" } } } ] }""";
+        Assert.Equal(12, Assert.IsType<UsageResult.Ok>(UsageResponseParser.Parse(own, FetchedAt)).Snapshot.SevenDayFable!.Utilization);
+        const string other = """{ "limits": [ { "kind": "weekly_scoped", "percent": 8, "scope": { "model": { "display_name": "Opus" } } }, { "kind": "session", "percent": 50 } ] }""";
+        Assert.Null(Assert.IsType<UsageResult.Ok>(UsageResponseParser.Parse(other, FetchedAt)).Snapshot.SevenDayFable);
+        Assert.Null(Assert.IsType<UsageResult.Ok>(UsageResponseParser.Parse(FullPayload, FetchedAt)).Snapshot.SevenDayFable);
+    }
+
     [Theory]
     [InlineData(150.0, 100.0)]
     [InlineData(-5.0, 0.0)]

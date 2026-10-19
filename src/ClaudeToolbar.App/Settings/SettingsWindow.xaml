@@ -95,6 +95,7 @@
                             <CheckBox Content="Weekly (7d)" IsChecked="{Binding ShowSevenDay}" />
                             <CheckBox Content="Weekly Opus" IsChecked="{Binding ShowSevenDayOpus}" />
                             <CheckBox Content="Weekly Sonnet" IsChecked="{Binding ShowSevenDaySonnet}" />
+                            <CheckBox Content="Weekly Fable" IsChecked="{Binding ShowSevenDayFable}" />
                         </WrapPanel>
                         <WrapPanel Margin="0,6,0,0">
                             <CheckBox Content="Label" IsChecked="{Binding ShowLabel}" />

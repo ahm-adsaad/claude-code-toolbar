@@ -101,6 +101,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     public bool ShowSevenDay { get => _s.Rows.ShowSevenDay; set { _s.Rows.ShowSevenDay = value; Changed(); } }
     public bool ShowSevenDayOpus { get => _s.Rows.ShowSevenDayOpus; set { _s.Rows.ShowSevenDayOpus = value; Changed(); } }
     public bool ShowSevenDaySonnet { get => _s.Rows.ShowSevenDaySonnet; set { _s.Rows.ShowSevenDaySonnet = value; Changed(); } }
+    public bool ShowSevenDayFable { get => _s.Rows.ShowSevenDayFable; set { _s.Rows.ShowSevenDayFable = value; Changed(); } }
     public bool ShowLabel { get => _s.Rows.ShowLabel; set { _s.Rows.ShowLabel = value; Changed(); } }
     public bool ShowBar { get => _s.Rows.ShowBar; set { _s.Rows.ShowBar = value; Changed(); } }
     public bool ShowPercent { get => _s.Rows.ShowPercent; set { _s.Rows.ShowPercent = value; Changed(); } }
