@@ -101,7 +101,7 @@ public partial class WidgetWindow
 
         // The app refreshes an open flyout every second, and a transparent popup redraws in software, so
         // rebuilding it each time costs real CPU. When the same lines are still there, only their text changes.
-        var shape = (model.Lines.Count, string.Join("\n", sessions.Select(s => s.Id)), hint is not null, theme);
+        var shape = (string.Join(",", model.Lines.Select(l => l.Tint)), string.Join("\n", sessions.Select(s => s.Id)), hint is not null, theme);
         if (!shape.Equals(_flyoutShape))
         {
             _flyoutShape = shape;
@@ -109,7 +109,11 @@ public partial class WidgetWindow
             _flyoutBorder.BorderBrush = theme.BarTrack;
             _flyoutPanel.Children.Clear();
             foreach (var line in model.Lines)
-                _flyoutPanel.Children.Add(MakeLine(line.Text, theme, theme.FontSize + 1, 1.0, new Thickness(0, 1, 0, 1)));
+            {
+                var block = MakeLine(line.Text, theme, theme.FontSize + 1, 1.0, new Thickness(0, 1, 0, 1));
+                if (line.Tint is { } tint) block.Foreground = theme.BrushFor(tint);
+                _flyoutPanel.Children.Add(block);
+            }
             foreach (var session in sessions)
                 _flyoutPanel.Children.Add(MakeSessionLine(session, theme));
             if (hint is not null)

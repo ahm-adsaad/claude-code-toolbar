@@ -26,6 +26,8 @@ public sealed class UsageRowsControl : Border
     public event Action? MascotClicked;
 
     private string? _mascotTooltip;
+    private RowSettings? _settings;
+    private WidgetTheme? _theme;
 
     public UsageRowsControl()
     {
@@ -52,6 +54,8 @@ public sealed class UsageRowsControl : Border
 
     public void Render(WidgetModel model, RowSettings rows, WidgetTheme theme)
     {
+        _settings = rows;
+        _theme = theme;
         Background = theme.Background;
         CornerRadius = new CornerRadius(theme.CornerRadius);
         Opacity = model.Dimmed ? 0.5 : 1.0;
@@ -93,7 +97,7 @@ public sealed class UsageRowsControl : Border
         for (var i = 0; i < _live.Count && i < model.Rows.Count; i++)
         {
             var (time, percent) = _live[i];
-            if (time.Text != model.Rows[i].TimeText) time.Text = model.Rows[i].TimeText;
+            if (_settings is not null && _theme is not null) SetTime(time, model.Rows[i], _settings, _theme);
             if (percent.Text != model.Rows[i].PercentText) percent.Text = model.Rows[i].PercentText;
         }
     }
@@ -137,14 +141,25 @@ public sealed class UsageRowsControl : Border
         Grid.SetColumn(percent, 2);
         grid.Children.Add(percent);
 
-        var time = MakeText(row.TimeText, theme, Gap);
+        var time = MakeText(string.Empty, theme, Gap);
         time.MinWidth = 40;
-        time.Visibility = rows.ShowTime ? Visibility.Visible : Visibility.Collapsed;
+        SetTime(time, row, rows, theme);
         Grid.SetColumn(time, 3);
         grid.Children.Add(time);
 
         _live.Add((time, percent));
         return grid;
+    }
+
+    /// <summary>The reset countdown, or the pace warning in its colour; the warning shows even with "Show time" off.</summary>
+    private static void SetTime(TextBlock time, WidgetRow row, RowSettings rows, WidgetTheme theme)
+    {
+        var text = row.Warning ?? row.TimeText;
+        if (time.Text != text) time.Text = text;
+        var brush = row.Warning is null ? theme.Text : theme.BrushFor(row.WarningLevel);
+        if (!ReferenceEquals(time.Foreground, brush)) time.Foreground = brush;
+        var visibility = rows.ShowTime || row.Warning is not null ? Visibility.Visible : Visibility.Collapsed;
+        if (time.Visibility != visibility) time.Visibility = visibility;
     }
 
     private static TextBlock MakeText(string text, WidgetTheme theme, double leftMargin) => new()

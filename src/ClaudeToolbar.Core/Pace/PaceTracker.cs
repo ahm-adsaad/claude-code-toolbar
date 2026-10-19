@@ -86,10 +86,18 @@ public sealed class PaceTracker
         if (_state.Limits.GetValueOrDefault(limit) is not { Latest: { } cur } history) return PaceEstimate.Learning;
         if (cur.Utilization >= 100) return new PaceEstimate(PaceVerdict.UsedUp, TimeSpan.Zero, null, workingSessions, TimeSpan.Zero, PaceBasis.Work);
 
-        var risen = history.Points.Where(p => cur.Utilization - p.Utilization >= MinRise).ToList();
-        if (risen.Count == 0) return PaceEstimate.Learning;
+        // Measured from the newest reading that is far enough back in working time, else from the oldest that shows a
+        // rise at all. One pass without allocating: the app asks for every limit once a second.
         var lookback = Lookback(limit).TotalMinutes;
-        var start = risen.LastOrDefault(p => cur.ActiveMinutes - p.ActiveMinutes >= lookback) ?? risen[0];
+        PacePoint? oldest = null, start = null;
+        foreach (var p in history.Points)
+        {
+            if (cur.Utilization - p.Utilization < MinRise) continue;
+            oldest ??= p;
+            if (cur.ActiveMinutes - p.ActiveMinutes >= lookback) start = p;
+        }
+        if (oldest is null) return PaceEstimate.Learning;
+        start ??= oldest;
 
         var dU = cur.Utilization - start.Utilization;
         var dW = cur.WorkMinutes - start.WorkMinutes;

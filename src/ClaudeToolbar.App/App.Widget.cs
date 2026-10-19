@@ -81,6 +81,7 @@ public partial class App
         };
         _controller = new WidgetController(_widget, new TaskbarTracker(_widget), () => Settings);
         _theme = WidgetTheme.FromSettings(Settings.Appearance);
+        StartPace();
         RenderWidget(_monitor.State);
         _controller.Start();
 
@@ -134,6 +135,7 @@ public partial class App
     private void OnMonitorState(MonitorState state)
     {
         Log.Info($"Usage state: {state.Status}{(state.Message is null ? string.Empty : " — " + state.Message)}");
+        RecordPace(state);
         RenderWidget(state);
         ObserveCues(state);
         if (state.Status == UsageStatus.Ok && !_greeted)
@@ -147,7 +149,8 @@ public partial class App
     private void RenderWidget(MonitorState state)
     {
         if (_widget is null) return;
-        _model = WidgetModelBuilder.Build(state, Settings, DateTimeOffset.UtcNow);
+        var now = DateTimeOffset.UtcNow;
+        _model = WidgetModelBuilder.Build(state, Settings, now, PaceEstimates(now));
         _widget.Render(_model, Settings.Rows, _theme ??= WidgetTheme.FromSettings(Settings.Appearance));
         UpdateMascot();
         _controller?.Reposition();
@@ -168,7 +171,7 @@ public partial class App
     {
         if (_widget is null || _monitor is null || _theme is null) return;
         var now = DateTimeOffset.UtcNow;
-        var flyout = FlyoutModelBuilder.Build(_monitor.State, now, t => t.ToLocalTime().ToString("HH:mm"));
+        var flyout = FlyoutModelBuilder.Build(_monitor.State, now, t => t.ToLocalTime().ToString("HH:mm"), PaceEstimates(now), HooksInstalled);
         _widget.ShowFlyout(flyout, SessionLines(now), JumpHint(now), _theme);
     }
 
@@ -185,7 +188,9 @@ public partial class App
 
         _ = SafeTickAsync();
 
-        _model = WidgetModelBuilder.Build(_monitor.State, Settings, DateTimeOffset.UtcNow);
+        AdvancePace();
+        var now = DateTimeOffset.UtcNow;
+        _model = WidgetModelBuilder.Build(_monitor.State, Settings, now, PaceEstimates(now));
         _widget.UpdateTimes(_model);
         TickSessions();
         UpdateMascot();
@@ -243,6 +248,13 @@ public partial class App
 
     private void OnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
     {
+        if (e.Mode == PowerModes.Suspend)
+        {
+            // Sessions cannot work while the machine sleeps; without this the gap would count as working time.
+            var at = DateTimeOffset.UtcNow;
+            Dispatcher.InvokeAsync(() => SuspendPace(at));
+            return;
+        }
         if (e.Mode != PowerModes.Resume) return;
         Dispatcher.InvokeAsync(() =>
         {
@@ -302,6 +314,8 @@ public partial class App
     {
         _tick?.Stop();
         _waveTimer?.Stop();
+        AdvancePace();
+        SavePace(force: true);
         StopNotifications();
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;

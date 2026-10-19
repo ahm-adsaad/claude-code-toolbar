@@ -6,6 +6,7 @@ using System.Windows.Media;
 using ClaudeToolbar.App.Widget;
 using ClaudeToolbar.Core.Credentials;
 using ClaudeToolbar.Core.Mascot;
+using ClaudeToolbar.Core.Pace;
 using ClaudeToolbar.Core.Refresh;
 using ClaudeToolbar.Core.Settings;
 using ClaudeToolbar.Core.Usage;
@@ -59,7 +60,12 @@ public partial class SettingsWindow : Window
             new UsageWindow(72, now.AddDays(3).AddHours(4)),
             now);
         var state = new MonitorState(UsageStatus.Ok, snapshot, now, null, new CredentialsState.Missing("preview"));
-        var model = WidgetModelBuilder.Build(state, _vm.Settings, now);
+        // The Fable row shows the pace warning, so the preview has every colour the widget can take.
+        var pace = new Dictionary<UsageLimit, PaceEstimate>
+        {
+            [UsageLimit.SevenDayFable] = new(PaceVerdict.RunsOutFirst, TimeSpan.FromHours(6), null, 1, TimeSpan.FromHours(9), PaceBasis.Work),
+        };
+        var model = WidgetModelBuilder.Build(state, _vm.Settings, now, pace);
         _preview.Render(model, _vm.Settings.Rows, WidgetTheme.FromSettings(_vm.Settings.Appearance));
         _preview.SetMascot(MascotModelBuilder.Build(model, _vm.Settings.Behavior.Mascot, WaveAnimation.RestAngle, MascotBadge.Working));
     }

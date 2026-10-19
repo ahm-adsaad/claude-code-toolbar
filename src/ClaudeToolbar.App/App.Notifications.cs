@@ -122,6 +122,7 @@ public partial class App
             var e = HookEventParser.Parse(body);
             if (e is null) return;
             var cue = _sessions.Apply(e, DateTimeOffset.UtcNow, host);
+            AdvancePace();
             Log.Info($"Session {e.SessionId[..Math.Min(8, e.SessionId.Length)]} ({_sessions.Sessions.FirstOrDefault(s => s.Id == e.SessionId)?.Name}): {e.Kind}{(e.RunningAgents switch { 0 => "", 1 => " (1 agent still running)", var n => $" ({n} agents still running)" })}{(cue is null ? "" : " → " + cue)}");
             if (cue is { } c) React(c);
             RefreshSessionUi();
@@ -158,6 +159,7 @@ public partial class App
         {
             _lastPrune = DateTime.UtcNow;
             _sessions.Prune(DateTimeOffset.UtcNow);
+            AdvancePace();
             _badge = _sessions.Badge;
             // A pruned session must not leave a tooltip summarising sessions that are no longer there.
             if (_model is not null) Tray?.SetTooltip(BuildTooltip(_model));
@@ -168,6 +170,7 @@ public partial class App
     {
         if (_sessions.Badge == MascotBadge.None) return;
         _sessions.Acknowledge();
+        AdvancePace();
         RefreshSessionUi();
     }
 
