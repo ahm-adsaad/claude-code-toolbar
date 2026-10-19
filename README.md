@@ -51,10 +51,21 @@ This works wherever Claude Code hooks fire: the terminal, the VS Code and JetBra
 
 ### What it shows
 
+By default each limit is a ring that fills clockwise, with its short name inside (`5h`, `7d`, `Op`, `So`, `Fa`) and the percentage over the time to reset beside it:
+
+```
+( 5h ) 42%       ( 7d ) 18%      ( Fa ) 4%
+       2h 13m           3d 4h           1d 22h
+```
+
+Settings → Appearance → Layout switches to **Upright bars** (a thin bar that fills upward, then `5h 42%` over the time) or **Rows**, the original look, which puts rows in columns of two:
+
 ```
 5h ▮▮▮▮▮▯▯▯▯▯ 42%  2h 13m
 7d ▮▮▯▯▯▯▯▯▯▯ 18%  3d 4h
 ```
+
+When a limit would run out before it resets, its time line shows the work left instead, such as `~6h work` (see [How long it'll keep going](#how-long-itll-keep-going)).
 
 Hover for exact reset times and the last update time. Left-click (away from Clawd) opens settings. Right-click for refresh / settings / run at startup / desktop shortcut / exit. A tray icon offers the same menu.
 
@@ -72,8 +83,8 @@ It reads `%USERPROFILE%\.claude\.credentials.json` (or `%CLAUDE_CONFIG_DIR%\.cre
 
 Open from the widget, the tray icon, or by launching the exe a second time.
 
-- Appearance: presets (Dark, Light, Claude, Mono), colours for background, text, bar track and the three bar levels, font size, corner radius, warning/critical thresholds.
-- Rows: which windows to show, and whether to show the label, bar, percent and time.
+- Appearance: layout (Rings, Upright bars, Rows), presets (Dark, Light, Claude, Mono), colours for background, text, bar track and the three bar levels, font size, corner radius, warning/critical thresholds.
+- Rows: which windows to show, and whether to show the label, bar (the ring or upright bar in the compact layouts), percent and time, and the bar width (Rows layout only).
 - Behaviour: refresh interval, gap from the tray, hide when a fullscreen app is active, run at startup, desktop shortcut.
 - Mascot: waves on hover and at thresholds, on hover only, or off.
 - Notifications: listen for Claude Code events, port, chime, install/remove the hooks, test.
