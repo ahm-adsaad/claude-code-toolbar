@@ -61,6 +61,17 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     public string BarWarn { get => _s.Appearance.BarWarn; set => SetColor(v => _s.Appearance.BarWarn = v, value); }
     public string BarCrit { get => _s.Appearance.BarCrit; set => SetColor(v => _s.Appearance.BarCrit = v, value); }
 
+    public sealed record LayoutOption(string Value, string Label);
+
+    public IReadOnlyList<LayoutOption> LayoutOptions { get; } =
+    [
+        new(WidgetLayout.Rings, "Rings"),
+        new(WidgetLayout.Bars, "Upright bars"),
+        new(WidgetLayout.Rows, "Rows"),
+    ];
+
+    public string Layout { get => _s.Appearance.Layout; set { _s.Appearance.Layout = WidgetLayout.Normalize(value); Changed(); } }
+
     public double FontSize { get => _s.Appearance.FontSize; set { _s.Appearance.FontSize = value; Changed(); } }
     public double CornerRadius { get => _s.Appearance.CornerRadius; set { _s.Appearance.CornerRadius = value; Changed(); } }
 

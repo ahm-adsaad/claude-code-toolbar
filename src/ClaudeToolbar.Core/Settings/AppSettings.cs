@@ -5,6 +5,7 @@ namespace ClaudeToolbar.Core.Settings;
 
 public sealed class AppearanceSettings
 {
+    public string Layout { get; set; } = WidgetLayout.Rings;
     public string Preset { get; set; } = "dark";
     public string Background { get; set; } = "#CC1E1E1E";
     public string Text { get; set; } = "#FFF3F3F3";

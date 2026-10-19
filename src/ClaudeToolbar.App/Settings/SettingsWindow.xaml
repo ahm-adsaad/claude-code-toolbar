@@ -36,6 +36,13 @@
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
                         <TextBlock Text="Appearance" Style="{StaticResource SectionHeader}" />
+                        <Grid Style="{StaticResource Row}" Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130" /><ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Layout" Style="{StaticResource FieldLabel}" />
+                            <ComboBox Grid.Column="1" ItemsSource="{Binding LayoutOptions}" SelectedValue="{Binding Layout}" SelectedValuePath="Value" DisplayMemberPath="Label" />
+                        </Grid>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                             <RadioButton Content="Dark" Style="{StaticResource Chip}" IsChecked="{Binding Preset, Converter={StaticResource Equals}, ConverterParameter=dark}" />
                             <RadioButton Content="Light" Style="{StaticResource Chip}" IsChecked="{Binding Preset, Converter={StaticResource Equals}, ConverterParameter=light}" />

@@ -14,6 +14,8 @@ public sealed class WidgetTheme
     public required Brush BarCrit { get; init; }
     public required double FontSize { get; init; }
     public required double CornerRadius { get; init; }
+    /// <summary>One of <see cref="WidgetLayout"/>'s values.</summary>
+    public string Layout { get; init; } = WidgetLayout.Rings;
 
     public static readonly FontFamily Font = new("Segoe UI Variable Text, Segoe UI");
 
@@ -27,6 +29,7 @@ public sealed class WidgetTheme
         BarCrit = BrushFrom(a.BarCrit),
         FontSize = a.FontSize,
         CornerRadius = a.CornerRadius,
+        Layout = WidgetLayout.Normalize(a.Layout),
     };
 
     public Brush BrushFor(BarLevel level) => level switch

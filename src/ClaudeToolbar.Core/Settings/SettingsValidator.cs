@@ -35,6 +35,7 @@ public static partial class SettingsValidator
         a.BarOk = NormalizeColor(a.BarOk, d.BarOk);
         a.BarWarn = NormalizeColor(a.BarWarn, d.BarWarn);
         a.BarCrit = NormalizeColor(a.BarCrit, d.BarCrit);
+        a.Layout = WidgetLayout.Normalize(a.Layout);
         a.FontSize = Math.Clamp(a.FontSize, 9, 14);
         a.CornerRadius = Math.Clamp(a.CornerRadius, 0, 12);
         a.WarnThreshold = Math.Clamp(a.WarnThreshold, 1, 99);

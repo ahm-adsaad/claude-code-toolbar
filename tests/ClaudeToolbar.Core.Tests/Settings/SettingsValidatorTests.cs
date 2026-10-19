@@ -25,6 +25,21 @@ public class SettingsValidatorTests
         Assert.True(SettingsJson.Deserialize("""{"rows":{"showFiveHour":true}}""").Rows.ShowSevenDayFable);
 
     [Fact]
+    public void OldSettingsFile_UsesRings() =>
+        Assert.Equal(WidgetLayout.Rings, SettingsValidator.Normalize(SettingsJson.Deserialize("""{"appearance":{"preset":"claude"}}""")).Appearance.Layout);
+
+    [Theory]
+    [InlineData(" Bars ", "bars")]
+    [InlineData("tiles", "rings")]
+    [InlineData(null, "rings")]
+    public void NormalizesTheLayout(string? stored, string expected)
+    {
+        var s = AppSettings.CreateDefault();
+        s.Appearance.Layout = stored!;
+        Assert.Equal(expected, SettingsValidator.Normalize(s).Appearance.Layout);
+    }
+
+    [Fact]
     public void ClampsRanges()
     {
         var s = AppSettings.CreateDefault();
